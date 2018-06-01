@@ -132,9 +132,12 @@ Resources:
             - arn:aws:s3:::codepipeline*
             Effect: Allow
           - Action:
-            - s3:*
             - cloudformation:*
             - iam:PassRole
+            Resource: '*'
+            Effect: Allow
+          - Action:
+            - s3:*
             Resource:
               - !Join
                 - ''
