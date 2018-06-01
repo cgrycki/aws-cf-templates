@@ -121,7 +121,6 @@ Resources:
             - s3:GetObjectVersion
             - s3:GetBucketVersioning
             Resource:
-              - !Ref SiteBucket
               - !Ref PipelineBucket
             Effect: Allow
           - Action:
@@ -149,8 +148,10 @@ Resources:
   PipelineBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
-    Rules:
-      ExpirationInDays: 1
+    Properties:
+      LifecycleConfiguration:
+        Rules:
+          ExpirationInDays: 1
   CodeBuildBuildSite:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
