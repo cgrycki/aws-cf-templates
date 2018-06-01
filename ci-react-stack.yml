@@ -121,7 +121,10 @@ Resources:
             - s3:GetObjectVersion
             - s3:GetBucketVersioning
             Resource:
-              - !Ref PipelineBucket
+              - !Join
+                - ''
+                - 'arn:aws:s3::::' 
+                - !Ref PipelineBucket
             Effect: Allow
           - Action:
             - s3:PutObject
@@ -133,8 +136,14 @@ Resources:
             - cloudformation:*
             - iam:PassRole
             Resource:
-              - !Ref SiteBucket
-              - !Ref PipelineBucket
+              - !Join
+                - ''
+                - 'arn:aws:s3::::' 
+                - !Ref SiteBucket
+              - !Join
+                - ''
+                - 'arn:aws:s3::::' 
+                - !Ref PipelineBucket
             Effect: Allow
           Version: '2012-10-17'
   SiteBucket:
