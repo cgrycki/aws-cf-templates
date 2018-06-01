@@ -151,8 +151,8 @@ Resources:
     Properties:
       LifecycleConfiguration:
         Rules:
-          - Status: Enabled
           - ExpirationInDays: 1
+            Status: Enabled
   CodeBuildBuildSite:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
