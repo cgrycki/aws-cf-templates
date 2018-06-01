@@ -151,6 +151,7 @@ Resources:
     Properties:
       LifecycleConfiguration:
         Rules:
+          - Status: Enabled
           - ExpirationInDays: 1
   CodeBuildBuildSite:
     Type: AWS::CodeBuild::Project
