@@ -123,8 +123,8 @@ Resources:
             Resource:
               - !Join
                 - ''
-                - 'arn:aws:s3::::' 
-                - !Ref PipelineBucket
+                - - 'arn:aws:s3::::' 
+                  - !Ref PipelineBucket
             Effect: Allow
           - Action:
             - s3:PutObject
@@ -138,12 +138,12 @@ Resources:
             Resource:
               - !Join
                 - ''
-                - 'arn:aws:s3::::' 
-                - !Ref SiteBucket
+                - - 'arn:aws:s3::::' 
+                  - !Ref SiteBucket
               - !Join
                 - ''
-                - 'arn:aws:s3::::' 
-                - !Ref PipelineBucket
+                - - 'arn:aws:s3::::' 
+                  - !Ref PipelineBucket
             Effect: Allow
           Version: '2012-10-17'
   SiteBucket:
