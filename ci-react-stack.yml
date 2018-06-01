@@ -14,43 +14,43 @@ Parameters:
   GitHubBranch:
     Type: String
     Description: GitHub Branch
-    Default: "master"
+    Default: 'master'
   GitHubToken:
     NoEcho: true
     Type: String
     Description: Secret. It might look something like 9b189a1654643522561f7b3ebd44a1531a4287af OAuthToken with access to Repo. Go to https://github.com/settings/tokens
   BuildType:
     Type: String
-    Default: "LINUX_CONTAINER"
+    Default: 'LINUX_CONTAINER'
     Description: The build container type to use for building the app
   BuildComputeType:
     Type: String
-    Default: "BUILD_GENERAL1_SMALL"
+    Default: 'BUILD_GENERAL1_SMALL'
     Description: The build compute type to use for building the app
   BuildImage:
     Type: String
-    Default: "aws/codebuild/nodejs:6.3.1"
+    Default: 'aws/codebuild/nodejs:6.3.1'
     Description: The build image to use for building the app
   DeployImage:
     Type: String
-    Default: "aws/codebuild/ubuntu-base:14.04"
+    Default: 'aws/codebuild/ubuntu-base:14.04'
     Description: The build image to use for deploying the app
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: "Site Configuration"
+          default: 'Site Configuration'
         Parameters:
           - SiteBucketName
       - Label:
-          default: "GitHub Configuration"
+          default: 'GitHub Configuration'
         Parameters:
           - GitHubToken
           - GitHubUser
           - GitHubRepo
           - GitHubBranch
       - Label:
-          default: "Build Configuration"
+          default: 'Build Configuration'
         Parameters:
           - BuildType
           - BuildComputeType
@@ -87,14 +87,14 @@ Resources:
             - codebuild.amazonaws.com
           Action:
           - sts:AssumeRole
-      Path: "/"
+      Path: /
       Policies:
       - PolicyName: codebuild-service
         PolicyDocument:
           Statement:
           - Effect: Allow
-            Action: "*"
-            Resource: "*"
+            Action: '*'
+            Resource: '*'
           Version: '2012-10-17'
   CodePipelineRole:
     Type: AWS::IAM::Role
@@ -107,31 +107,39 @@ Resources:
             - codepipeline.amazonaws.com
           Action:
           - sts:AssumeRole
-      Path: "/"
+      Path: /
       Policies:
       - PolicyName: codepipeline-service
         PolicyDocument:
           Statement:
           - Action:
-            - codebuild:*
-            Resource: "*"
+            - codebuild:StartBuild
+            - codebuild:BatchGetBuilds
+            - codebuild:StopBuild
+            Resource:
+            - !GetAtt 'CodeBuildBuildSite.Arn'
+            - !GetAtt 'CodeBuildDeploySite.Arn'
             Effect: Allow
           - Action:
             - s3:GetObject
             - s3:GetObjectVersion
             - s3:GetBucketVersioning
-            Resource: "*"
-            Effect: Allow
-          - Action:
             - s3:PutObject
             Resource:
-            - arn:aws:s3:::codepipeline*
+            - !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref 'PipelineBucket'
+            - !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref 'PipelineBucket'
+                - /*
             Effect: Allow
           - Action:
-            - s3:*
             - cloudformation:*
             - iam:PassRole
-            Resource: "*"
+            Resource: '*'
             Effect: Allow
           Version: '2012-10-17'
   SiteBucket:
