@@ -123,13 +123,16 @@ Resources:
             Resource:
               - !Join
                 - ''
-                - - 'arn:aws:s3::::' 
+                - - 'arn:aws:s3:::' 
                   - !Ref PipelineBucket
             Effect: Allow
           - Action:
             - s3:PutObject
             Resource:
-            - arn:aws:s3:::codepipeline*
+              - !Join
+                  - ''
+                  - - 'arn:aws:s3:::' 
+                    - !Ref PipelineBucket
             Effect: Allow
           - Action:
             - cloudformation:*
@@ -141,11 +144,11 @@ Resources:
             Resource:
               - !Join
                 - ''
-                - - 'arn:aws:s3::::' 
+                - - 'arn:aws:s3:::' 
                   - !Ref SiteBucket
               - !Join
                 - ''
-                - - 'arn:aws:s3::::' 
+                - - 'arn:aws:s3:::' 
                   - !Ref PipelineBucket
             Effect: Allow
           Version: '2012-10-17'
