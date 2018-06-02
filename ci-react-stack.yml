@@ -35,27 +35,34 @@ Parameters:
     Type: String
     Default: 'aws/codebuild/ubuntu-base:14.04'
     Description: The build image to use for deploying the app
+  EmailAddress:
+    Type: String
+    Description: E-Mail address that will receive pipeline state notifications
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: 'Site Configuration'
+          default: Site Configuration
         Parameters:
           - SiteBucketName
       - Label:
-          default: 'GitHub Configuration'
+          default: GitHub Configuration
         Parameters:
           - GitHubToken
           - GitHubUser
           - GitHubRepo
           - GitHubBranch
       - Label:
-          default: 'Build Configuration'
+          default: Build Configuration
         Parameters:
           - BuildType
           - BuildComputeType
           - BuildImage
           - DeployImage
+      - Label:
+          default: Notifications
+        Parameters:
+          - EmailAddress
     ParameterLabels:
       SiteBucketName:
         default: Name of S3 Bucket to create for website hosting
@@ -75,6 +82,8 @@ Metadata:
         default: Build image
       DeployImage: 
         default: Deploy image
+      EmailAddress:
+        default: E-Mail Address
 Resources:
   CodeBuildRole:
     Type: AWS::IAM::Role
@@ -137,6 +146,27 @@ Resources:
                 - /*
             Effect: Allow
           Version: '2012-10-17'
+  CloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - events.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: cloudwatch-service
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: sns:Publish
+                Resource:
+                - !Ref 'PipelineStateNotification'
+            Version: '2012-10-17'
   SiteBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -186,7 +216,7 @@ Resources:
             files:
               - '**/*'
             base-directory: build
-      TimeoutInMinutes: 10
+      TimeoutInMinutes: 15
   CodeBuildDeploySite:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
@@ -248,7 +278,7 @@ Resources:
           RunOrder: 1
       - Name: Deploy
         Actions:
-        - Name: Artifact
+        - Name: S3_Deploy
           ActionTypeId:
             Category: Build
             Owner: AWS
@@ -264,6 +294,42 @@ Resources:
       ArtifactStore:
         Type: S3
         Location: !Ref PipelineBucket
+  PipelineStateNotification:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+      - Endpoint:
+          Ref: EmailAddress
+        Protocol: email
+  PipelineEventRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Send a notification about the pipeline state
+      RoleArn: !GetAtt CloudWatchRole.Arn
+      EventPattern: 
+        source:
+        - aws.codepipeline
+        detail-type:
+        - CodePipeline Pipeline Execution State Change
+        detail:
+          state:
+          - STARTED
+          - SUCCEEDED
+          - RESUMED
+          - FAILED
+          - CANCELED
+          - SUPERSEDED
+          pipeline:
+          - !Ref Pipeline
+      State: ENABLED
+      Targets: 
+        - Arn: !Ref 'PipelineStateNotification'
+          Id: Pipeline_State_Notification
+          InputTransformer:
+            InputTemplate: !Sub '"The Pipeline <pipeline> has <state>. Additional details can be reviewed at https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}."'
+            InputPathsMap:
+              pipeline: $.detail.pipeline
+              state: $.detail.state
 Outputs:
   PipelineUrl:
     Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
