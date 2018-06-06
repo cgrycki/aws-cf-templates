@@ -5,6 +5,9 @@ Parameters:
   SiteBucketName:
     Type: String
     Description: Name of bucket to create to host the website
+  SiteCloudFrontName:
+    Type: String
+    Description: Full domain name for site on cloudfront. Should look something like test.contoso.com
   GitHubUser:
     Type: String
     Description: GitHub User
@@ -45,6 +48,7 @@ Metadata:
           default: Site Configuration
         Parameters:
           - SiteBucketName
+          - SiteCloudFrontName
       - Label:
           default: GitHub Configuration
         Parameters:
@@ -66,6 +70,8 @@ Metadata:
     ParameterLabels:
       SiteBucketName:
         default: Name of S3 Bucket to create for website hosting
+      SiteCloudFrontName:
+        default: Site domain name for hosting in cloudfront
       GitHubToken:
         default: GitHub OAuth2 Token
       GitHubUser: 
@@ -146,27 +152,6 @@ Resources:
                 - /*
             Effect: Allow
           Version: '2012-10-17'
-  CloudWatchRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service:
-            - events.amazonaws.com
-          Action:
-          - sts:AssumeRole
-      Path: /
-      Policies:
-        - PolicyName: cloudwatch-service
-          PolicyDocument:
-            Statement:
-              - Effect: Allow
-                Action: sns:Publish
-                Resource:
-                - !Ref 'PipelineStateNotification'
-            Version: '2012-10-17'
   SiteBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -237,7 +222,10 @@ Resources:
           phases:
             build:
               commands:
+                - echo Deploying site to S3
                 - aws s3 sync . s3://${SiteBucketName} --delete --acl public-read
+                - echo Invalidating all files in cloudfront cache
+                - echo aws cloudfront create-invalidation --distribution-id ${!Ref CloudFrontDistribution} --paths "/*"
       TimeoutInMinutes: 10
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -294,18 +282,31 @@ Resources:
       ArtifactStore:
         Type: S3
         Location: !Ref PipelineBucket
+  SNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: CloudWatchPublishPolicy
+        Version: '2012-10-17'
+        Statement:
+        - Sid: CloudWatchPublicPolicy
+          Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action: sns:Publish
+          Resource: !Ref PipelineStateNotification
+      Topics:
+        - !Ref PipelineStateNotification
   PipelineStateNotification:
     Type: AWS::SNS::Topic
     Properties:
       Subscription:
-      - Endpoint:
-          Ref: EmailAddress
+      - Endpoint: !Ref EmailAddress
         Protocol: email
   PipelineEventRule: 
     Type: AWS::Events::Rule
     Properties: 
       Description: Send a notification about the pipeline state
-      RoleArn: !GetAtt CloudWatchRole.Arn
       EventPattern: 
         source:
         - aws.codepipeline
