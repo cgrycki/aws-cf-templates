@@ -225,7 +225,7 @@ Resources:
                 - echo Deploying site to S3
                 - aws s3 sync . s3://${SiteBucketName} --delete --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - echo aws cloudfront create-invalidation --distribution-id ${!Ref CloudFrontDistribution} --paths "/*"
+                - echo 'aws cloudfront create-invalidation --distribution-id ${!Ref CloudFrontDistribution} --paths "/*"'
       TimeoutInMinutes: 10
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
