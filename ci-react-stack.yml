@@ -1,13 +1,13 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Pipeline using CodePipeline and CodeBuild for continuous delivery of a single-page application to S3
+Description: Pipeline using CodePipeline and CodeBuild for continuous delivery of a single-page application to S3 and CloudFront
 Parameters:
   SiteBucketName:
     Type: String
     Description: Name of bucket to create to host the website
   SiteCloudFrontName:
     Type: String
-    Description: Full domain name for site on cloudfront. Should look something like test.contoso.com
+    Description: Full domain name for site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
   GitHubUser:
     Type: String
     Description: GitHub User
@@ -41,6 +41,8 @@ Parameters:
   EmailAddress:
     Type: String
     Description: E-Mail address that will receive pipeline state notifications
+Conditions:
+  UseCustomDomainName: !Not [!Equals [!Ref SiteCloudFrontName, '']]
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -71,7 +73,7 @@ Metadata:
       SiteBucketName:
         default: Name of S3 Bucket to create for website hosting
       SiteCloudFrontName:
-        default: Site domain name for hosting in cloudfront
+        default: Site domain name for hosting in cloudfront [Optional]
       GitHubToken:
         default: GitHub OAuth2 Token
       GitHubUser: 
@@ -156,10 +158,7 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
-      AccessControl: PublicRead
       BucketName: !Ref SiteBucketName
-      WebsiteConfiguration:
-        IndexDocument: index.html
   PipelineBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -225,7 +224,7 @@ Resources:
                 - echo Deploying site to S3
                 - aws s3 sync . s3://${SiteBucketName} --delete --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - echo 'aws cloudfront create-invalidation --distribution-id ${!Ref CloudFrontDistribution} --paths "/*"'
+                - aws cloudfront create-invalidation --distribution-id ${!Ref CloudFrontDistribution} --paths '/*'
       TimeoutInMinutes: 10
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
@@ -369,12 +368,81 @@ Resources:
               - ''
               - - '"'
                 - 'The site has been updated. URL: '
-                - !GetAtt [SiteBucket, WebsiteURL]
+                - !Join
+                  - ''
+                  - - 'https://'
+                    - !GetAtt [CloudFrontDistribution, DomainName]
                 - '"'
+  CloudFrontOriginAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: Used to retrieve content from S3
+  SiteBucketCloudFrontPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Statement:
+          - Sid: 'CloudFrontGetObject'
+            Action: 
+            - s3:GetObject
+            Effect: Allow
+            Resource:
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref SiteBucket
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref SiteBucket
+                  - '/*'
+            Principal:
+              AWS:
+                !Join
+                  - ' '
+                  - - 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity'
+                    - !Ref CloudFrontOriginAccessIdentity
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: Distribution from an S3 Bucket
+        DefaultRootObject: index.html
+        Aliases:
+          - !If [UseCustomDomainName, !Ref SiteCloudFrontName, !Ref 'AWS::NoValue']
+        DefaultCacheBehavior:
+          Compress: True
+          ForwardedValues:
+            QueryString: False
+            Cookies:
+              Forward: none
+          TargetOriginId: s3-origin
+          ViewerProtocolPolicy: redirect-to-https
+        DefaultRootObject: index.html
+        Enabled: True
+        Origins:
+          - DomainName: !GetAtt SiteBucket.DomainName
+            Id: s3-origin
+            S3OriginConfig:
+              OriginAccessIdentity:
+                !Join
+                  - '/'
+                  - - 'origin-access-identity'
+                    - 'cloudfront'
+                    - !Ref CloudFrontOriginAccessIdentity
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: True
 Outputs:
   PipelineUrl:
     Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
     Description: CodePipeline URL
   SiteUrl:
-    Value: !GetAtt [SiteBucket, WebsiteURL]
+    Value: 
+      !Join
+        - ''
+        - - 'https://'
+          - !GetAtt [CloudFrontDistribution, DomainName]
     Description: S3 Website URL
