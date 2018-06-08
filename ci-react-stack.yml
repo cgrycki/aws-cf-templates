@@ -372,6 +372,14 @@ Resources:
                   - ''
                   - - 'https://'
                     - !GetAtt [CloudFrontDistribution, DomainName]
+                - !If 
+                  - UseCustomDomainName
+                  - !Join 
+                    - ''
+                    - - '\n'
+                      - 'Alternative URL:'
+                      - !Ref SiteCloudFrontName
+                  - !Ref 'AWS::NoValue'
                 - '"'
   CloudFrontOriginAccessIdentity:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
