@@ -282,22 +282,37 @@ Resources:
       ArtifactStore:
         Type: S3
         Location: !Ref PipelineBucket
-  SNSTopicPolicy:
+  SiteDeploymentSNSTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Id: SiteDeploymentPublishPolicy
+        Version: '2012-10-17'
+        Statement:
+        - Sid: SiteDeploymentPublishPolicy
+          Effect: Allow
+          Principal:
+            Service: events.amazonaws.com
+          Action: sns:Publish
+          Resource: !Ref DeveloperNotification
+      Topics:
+        - !Ref DeveloperNotification
+  PipelineStateSNSTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
       PolicyDocument:
         Id: CloudWatchPublishPolicy
         Version: '2012-10-17'
         Statement:
-        - Sid: CloudWatchPublicPolicy
+        - Sid: CloudWatchPublishPolicy
           Effect: Allow
           Principal:
             Service: events.amazonaws.com
           Action: sns:Publish
-          Resource: !Ref PipelineStateNotification
+          Resource: !Ref DeveloperNotification
       Topics:
-        - !Ref PipelineStateNotification
-  PipelineStateNotification:
+        - !Ref DeveloperNotification
+  DeveloperNotification:
     Type: AWS::SNS::Topic
     Properties:
       Subscription:
@@ -324,13 +339,38 @@ Resources:
           - !Ref Pipeline
       State: ENABLED
       Targets: 
-        - Arn: !Ref 'PipelineStateNotification'
+        - Arn: !Ref 'DeveloperNotification'
           Id: Pipeline_State_Notification
           InputTransformer:
             InputTemplate: !Sub '"The Pipeline <pipeline> has <state>. Additional details can be reviewed at https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}."'
             InputPathsMap:
               pipeline: $.detail.pipeline
               state: $.detail.state
+  SiteDeploymentEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Send a notification when the site is successfully deployed to S3
+      EventPattern:
+        source:
+        - aws.codebuild
+        detail-type:
+        - CodeBuild Build State Change
+        detail:
+          build-status:
+            - SUCCEEDED
+          project-name:
+          - !Ref CodeBuildDeploySite
+      State: ENABLED
+      Targets:
+        - Arn: !Ref 'DeveloperNotification'
+          Id: CodeBuild_DeploySite_Notification
+          Input:
+            !Join
+              - ''
+              - - '"'
+                - 'The site has been updated. URL: '
+                - !GetAtt [SiteBucket, WebsiteURL]
+                - '"'
 Outputs:
   PipelineUrl:
     Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
