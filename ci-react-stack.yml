@@ -214,6 +214,9 @@ Resources:
         Type: !Ref BuildType
         ComputeType: !Ref BuildComputeType
         Image: !Sub ${DeployImage}
+        EnvironmentVariables:
+          - Name: CloudFrontDistributionId
+            Value: !Ref CloudFrontDistribution
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -224,7 +227,7 @@ Resources:
                 - echo Deploying site to S3
                 - aws s3 sync . s3://${SiteBucketName} --delete --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id ${!Ref CloudFrontDistribution} --paths '/*'
+                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
       TimeoutInMinutes: 10
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
