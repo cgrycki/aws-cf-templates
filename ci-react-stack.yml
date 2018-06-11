@@ -4,10 +4,21 @@ Description: Pipeline using CodePipeline and CodeBuild for continuous delivery o
 Parameters:
   SiteBucketName:
     Type: String
-    Description: Name of bucket to create to host the website
+    Description: Name of bucket for website content
   SiteCloudFrontName:
     Type: String
     Description: Full domain name for site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
+  SiteValidationDomain:
+    Type: String
+    Description: FQDN for domain validation. Required if using custom CNAMEs with cloudfront. See https://docs.aws.amazon.com/acm/latest/APIReference/API_DomainValidationOption.html
+  SiteCloudFrontPriceClass:
+    Type: String
+    Description: Price class to use for cloudfront distribution.
+    Default: PriceClass_100
+    AllowedValues:
+      - PriceClass_100
+      - PriceClass_200
+      - PriceClass_300
   GitHubUser:
     Type: String
     Description: GitHub User
@@ -51,6 +62,8 @@ Metadata:
         Parameters:
           - SiteBucketName
           - SiteCloudFrontName
+          - SiteValidationDomain
+          - SiteCloudFrontPriceClass
       - Label:
           default: GitHub Configuration
         Parameters:
@@ -71,9 +84,13 @@ Metadata:
           - EmailAddress
     ParameterLabels:
       SiteBucketName:
-        default: Name of S3 Bucket to create for website hosting
+        default: Name of S3 Bucket to create for website 
       SiteCloudFrontName:
         default: Site domain name for hosting in cloudfront [Optional]
+      SiteValidationDomain:
+        default: FQDN for domain validation [Optional]
+      SiteCloudFrontPriceClass:
+        default: Price class for cloudfront distribution
       GitHubToken:
         default: GitHub OAuth2 Token
       GitHubUser: 
@@ -268,7 +285,7 @@ Resources:
           RunOrder: 1
       - Name: Deploy
         Actions:
-        - Name: S3_Deploy
+        - Name: Deploy
           ActionTypeId:
             Category: Build
             Owner: AWS
@@ -280,11 +297,11 @@ Resources:
           - Name: DeployOutput
           Configuration:
             ProjectName: !Ref CodeBuildDeploySite
-          RunOrder: 2
+          RunOrder: 1
       ArtifactStore:
         Type: S3
         Location: !Ref PipelineBucket
-  SiteDeploymentSNSTopicPolicy:
+  DeveloperNotificationSNSTopicPolicy:
     Type: AWS::SNS::TopicPolicy
     Properties:
       PolicyDocument:
@@ -292,21 +309,6 @@ Resources:
         Version: '2012-10-17'
         Statement:
         - Sid: SiteDeploymentPublishPolicy
-          Effect: Allow
-          Principal:
-            Service: events.amazonaws.com
-          Action: sns:Publish
-          Resource: !Ref DeveloperNotification
-      Topics:
-        - !Ref DeveloperNotification
-  PipelineStateSNSTopicPolicy:
-    Type: AWS::SNS::TopicPolicy
-    Properties:
-      PolicyDocument:
-        Id: CloudWatchPublishPolicy
-        Version: '2012-10-17'
-        Statement:
-        - Sid: CloudWatchPublishPolicy
           Effect: Allow
           Principal:
             Service: events.amazonaws.com
@@ -431,7 +433,6 @@ Resources:
               Forward: none
           TargetOriginId: s3-origin
           ViewerProtocolPolicy: redirect-to-https
-        DefaultRootObject: index.html
         Enabled: True
         Origins:
           - DomainName: !GetAtt SiteBucket.DomainName
@@ -443,9 +444,19 @@ Resources:
                   - - 'origin-access-identity'
                     - 'cloudfront'
                     - !Ref CloudFrontOriginAccessIdentity
-        PriceClass: PriceClass_100
+        PriceClass: !Ref SiteCloudFrontPriceClass
         ViewerCertificate:
           CloudFrontDefaultCertificate: True
+  Cert:
+    Type: AWS::CertificateManager::Certificate
+    Condition: UseCustomDomainName
+    Properties:
+      DomainName: !Ref SiteCloudFrontName
+      DomainValidationOptions:
+        - DomainName: !Ref SiteCloudFrontName
+          ValidationDomain: !Ref SiteValidationDomain
+          SubjectAlternativeNames:
+            - !GetAtt [CloudFrontDistribution, DomainName]
 Outputs:
   PipelineUrl:
     Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
