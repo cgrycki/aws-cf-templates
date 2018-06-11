@@ -206,7 +206,7 @@ Resources:
     DependsOn: CodeBuildRole
     Properties:
       Name: !Sub ${AWS::StackName}-DeploySite
-      Description: Deploy site to S3
+      Description: Deploy site to S3 and CloudFront
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -351,7 +351,7 @@ Resources:
   SiteDeploymentEventRule:
     Type: AWS::Events::Rule
     Properties:
-      Description: Send a notification when the site is successfully deployed to S3
+      Description: Send a notification when the site is successfully deployed to cloudfront
       EventPattern:
         source:
         - aws.codebuild
@@ -378,8 +378,8 @@ Resources:
                 - !If 
                   - UseCustomDomainName
                   - !Join 
-                    - ''
-                    - - '\n'
+                    - ' '
+                    - - ''
                       - 'Alternative URL:'
                       - !Ref SiteCloudFrontName
                   - !Ref 'AWS::NoValue'
@@ -456,4 +456,4 @@ Outputs:
         - ''
         - - 'https://'
           - !GetAtt [CloudFrontDistribution, DomainName]
-    Description: S3 Website URL
+    Description: CloudFront Website URL
