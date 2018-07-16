@@ -448,8 +448,8 @@ Resources:
             'Fn::ImportValue': !Sub '${ParentAlertStack}-TopicARN'
       - !Ref 'AWS::NoValue'
       VPCZoneIdentifier:
-      - PublicSubnetA
-      - PublicSubnetB
+      - !Ref PublicSubnetA
+      - !Ref PublicSubnetB
     CreationPolicy:
       ResourceSignal:
         Count: 1
