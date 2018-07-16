@@ -647,7 +647,7 @@ Resources:
               group: root
           services:
             sysvinit:
-              awslogs:
+              awslogsd:
                 enabled: true
                 ensureRunning: true
                 packages:
