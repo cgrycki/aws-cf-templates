@@ -20,7 +20,6 @@ Metadata:
     - Label:
         default: 'Parent Stacks'
       Parameters:
-      - ParentVPCStack
       - ParentSSHBastionStack
       - ParentAuthProxyStack
       - ParentAlertStack
@@ -29,6 +28,10 @@ Metadata:
         default: 'VPC'
       Parameters:
       - VpcId
+      - PublicSubnetA
+      - PublicSubnetB
+      - PrivateSubnetA
+      - PrivateSubnetB
     - Label:
         default: 'Domain Name and SSL certificates'
       Parameters:
@@ -56,9 +59,6 @@ Metadata:
       - DBServerInstanceType
       - DBBackupRetentionPeriod
 Parameters:
-  ParentVPCStack:
-    Description: 'Stack name of parent VPC stack based on vpc/vpc-*azs.yaml template.'
-    Type: String
   ParentSSHBastionStack:
     Description: 'Optional but recommended stack name of parent SSH bastion host/instance stack based on vpc/vpc-ssh-bastion.yaml template.'
     Type: String
@@ -75,6 +75,21 @@ Parameters:
     Description: 'Optional stack name of parent zone stack based on vpc/zone-*.yaml template.'
     Type: String
     Default: ''
+  VpcId:
+    Description: 'VPC ID'
+    Type: String
+  PublicSubnetA:
+    Description: 'Public Subnet A'
+    Type: String
+  PublicSubnetB:
+    Description: 'Public Subnet B'
+    Type: String
+  PrivateSubnetA:
+    Description: 'Private Subnet A'
+    Type: String
+  PrivateSubnetB:
+    Description: 'Private Subnet B'
+    Type: String
   DomainName:
     Description: 'The primary domain name of the blog.'
     Type: String
@@ -187,8 +202,7 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: 'wordpress-elb'
-      VpcId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-VPC'
+      VpcId: !Ref VpcId
   LoadBalancerSecurityGroupInWorld:
     Type: 'AWS::EC2::SecurityGroupIngress'
     Condition: HasNotAuthProxySecurityGroup
@@ -212,8 +226,7 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: 'wordpress-ec2'
-      VpcId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-VPC'
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
       - FromPort: 80
         IpProtocol: tcp
@@ -242,8 +255,7 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: 'wordpress-rds'
-      VpcId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-VPC'
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
       - IpProtocol: tcp
         FromPort: 3306
@@ -331,9 +343,8 @@ Resources:
     Type: 'AWS::ElasticLoadBalancingV2::LoadBalancer'
     Properties:
       Subnets:
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetAPublic'
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetBPublic'
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetCPublic'
+      - !Ref PublicSubnetA
+      - !Ref PublicSubnetB
       SecurityGroups:
       - !Ref LoadBalancerSecurityGroup
       Scheme: 'internet-facing'
@@ -362,8 +373,7 @@ Resources:
         HttpCode: '200-299'
       Port: 80
       Protocol: HTTP
-      VpcId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-VPC'
+      VpcId: !Ref VpcId
       TargetGroupAttributes:
       - Key: 'deregistration_delay.timeout_seconds'
         Value: 30
@@ -372,9 +382,8 @@ Resources:
     Properties:
       DBSubnetGroupDescription: 'DB subnet group'
       SubnetIds:
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetAPrivate'
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetBPrivate'
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetCPrivate'
+      - !Ref PrivateSubnetA
+      - !Ref PrivateSubnetB
   DatabaseCluster:
     Type: 'AWS::RDS::DBCluster'
     Properties:
@@ -827,9 +836,8 @@ Resources:
             'Fn::ImportValue': !Sub '${ParentAlertStack}-TopicARN'
       - !Ref 'AWS::NoValue'
       VPCZoneIdentifier:
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetAPublic'
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetBPublic'
-      - 'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetCPublic'
+      - !Ref PublicSubnetA
+      - !Ref PublicSubnetB
       Tags:
       - PropagateAtLaunch: true
         Value: wordpress
@@ -956,32 +964,21 @@ Resources:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EFSFileSystem
-      SubnetId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetAPublic'
+      SubnetId: !Ref PublicSubnetA
       SecurityGroups:
       - !Ref EFSSecurityGroup
   EFSMountTargetB:
     Type: AWS::EFS::MountTarget
     Properties:
       FileSystemId: !Ref EFSFileSystem
-      SubnetId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetBPublic'
-      SecurityGroups:
-      - !Ref EFSSecurityGroup
-  EFSMountTargetC:
-    Type: AWS::EFS::MountTarget
-    Properties:
-      FileSystemId: !Ref EFSFileSystem
-      SubnetId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-SubnetCPublic'
+      SubnetId: !Ref PublicSubnetB
       SecurityGroups:
       - !Ref EFSSecurityGroup
   EFSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allowing access to EFS
-      VpcId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-VPC'
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
       - IpProtocol: tcp
         FromPort: 2049
