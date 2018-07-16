@@ -1098,4 +1098,4 @@ Outputs:
     Description: 'The domain name of the CloudFront distribution.'
     Value: !Sub ${CloudFrontDistribution.DomainName}
     Export:
-Name: !Sub '${AWS::StackName}-CloudFrontDomainName'
+      Name: !Sub '${AWS::StackName}-CloudFrontDomainName'
