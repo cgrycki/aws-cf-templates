@@ -20,9 +20,17 @@ Metadata:
     - Label:
         default: 'Parent Stacks'
       Parameters:
-      - ParentVPCStack
       - ParentAlertStack
       - ParentZoneStack
+    - Label:
+        default: 'VPC'
+      Parameters:
+      - VpcId
+      - PublicSubnetA
+      - PublicSubnetB
+      - PrivateSubnetA
+      - PrivateSubnetB
+      - VPCClassB
     - Label:
         default: 'EC2 Parameters'
       Parameters:
@@ -32,9 +40,6 @@ Metadata:
       - LogsRetentionInDays
       - SubDomainName
 Parameters:
-  ParentVPCStack:
-    Description: 'Stack name of parent VPC stack based on vpc/vpc-*azs.yaml template.'
-    Type: String
   ParentAlertStack:
     Description: 'Optional but recommended stack name of parent alert stack based on operations/alert.yaml template.'
     Type: String
@@ -43,6 +48,35 @@ Parameters:
     Description: 'Optional stack name of parent zone stack based on vpc/zone-*.yaml template.'
     Type: String
     Default: ''
+  VpcId:
+    Description: 'VPC ID'
+    Type: String
+  PublicSubnetA:
+    Description: 'Public Subnet A'
+    Type: String
+  PublicSubnetB:
+    Description: 'Public Subnet B'
+    Type: String
+  PrivateSubnetA:
+    Description: 'Private Subnet A'
+    Type: String
+  PrivateSubnetB:
+    Description: 'Private Subnet B'
+    Type: String
+  VPCClassB:
+    Description: 'Class B of VPC (10.XXX.0.0/16)'
+    Type: Number
+    Default: 0
+    ConstraintDescription: 'Must be in the range [0-255]'
+    MinValue: 0
+    MaxValue: 255
+  VPCNetMask:
+    Description: 'Netmask of VPC'
+    Type: Number
+    Default: '21'
+    ConstraintDescription: 'Must be in the range [0-32]'
+    MinValue: 0
+    MaxValue: 32
   KeyName:
     Description: 'Optional key pair of the ec2-user to establish a SSH connection to the SSH bastion host/instance.'
     Type: String
@@ -132,16 +166,14 @@ Resources:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
       GroupDescription: !Sub
-      - 'SSH bastion host/instance 10.${ClassB}.0.0/16'
-      - ClassB:
-          'Fn::ImportValue': !Sub '${ParentVPCStack}-ClassB'
+      - 'SSH bastion host/instance 10.${VPCClassB}.0.0/${VPCNetMask}'
+      - ClassB: !Ref VPCClassB
       SecurityGroupIngress:
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
         CidrIp: '0.0.0.0/0'
-      VpcId:
-        'Fn::ImportValue': !Sub '${ParentVPCStack}-VPC'
+      VpcId: !Ref VpcId
   InstanceProfile:
     Type: 'AWS::IAM::InstanceProfile'
     Properties:
@@ -403,9 +435,8 @@ Resources:
       Tags:
       - Key: Name
         Value: !Sub
-        - 'SSH bastion host/instance 10.${ClassB}.0.0/16'
-        - ClassB:
-            'Fn::ImportValue': !Sub '${ParentVPCStack}-ClassB'
+        - 'SSH bastion host/instance 10.${VPCClassB}.0.0/${VPCNetMask}'
+        - ClassB: !Ref VPCClassB
         PropagateAtLaunch: true
       NotificationConfigurations: !If
       - HasAlertTopic
@@ -415,10 +446,9 @@ Resources:
           TopicARN:
             'Fn::ImportValue': !Sub '${ParentAlertStack}-TopicARN'
       - !Ref 'AWS::NoValue'
-      VPCZoneIdentifier: !Split
-      - ','
-      - 'Fn::ImportValue':
-          !Sub '${ParentVPCStack}-SubnetsPublic'
+      VPCZoneIdentifier:
+      - PublicSubnetA
+      - PublicSubnetB
     CreationPolicy:
       ResourceSignal:
         Count: 1
