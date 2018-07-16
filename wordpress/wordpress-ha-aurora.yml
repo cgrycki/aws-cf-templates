@@ -26,6 +26,10 @@ Metadata:
       - ParentAlertStack
       - ParentZoneStack
     - Label:
+        default: 'VPC'
+      Parameters:
+      - VpcId
+    - Label:
         default: 'Domain Name and SSL certificates'
       Parameters:
       - DomainName
