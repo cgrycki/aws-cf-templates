@@ -26,11 +26,12 @@ Metadata:
         default: 'VPC'
       Parameters:
       - VpcId
+      - VPCClassB
+      - VPCNetMask
       - PublicSubnetA
       - PublicSubnetB
       - PrivateSubnetA
       - PrivateSubnetB
-      - VPCClassB
     - Label:
         default: 'EC2 Parameters'
       Parameters:
@@ -51,18 +52,6 @@ Parameters:
   VpcId:
     Description: 'VPC ID'
     Type: String
-  PublicSubnetA:
-    Description: 'Public Subnet A'
-    Type: String
-  PublicSubnetB:
-    Description: 'Public Subnet B'
-    Type: String
-  PrivateSubnetA:
-    Description: 'Private Subnet A'
-    Type: String
-  PrivateSubnetB:
-    Description: 'Private Subnet B'
-    Type: String
   VPCClassB:
     Description: 'Class B of VPC (10.XXX.0.0/16)'
     Type: Number
@@ -77,6 +66,18 @@ Parameters:
     ConstraintDescription: 'Must be in the range [0-32]'
     MinValue: 0
     MaxValue: 32
+  PublicSubnetA:
+    Description: 'Public Subnet A'
+    Type: String
+  PublicSubnetB:
+    Description: 'Public Subnet B'
+    Type: String
+  PrivateSubnetA:
+    Description: 'Private Subnet A'
+    Type: String
+  PrivateSubnetB:
+    Description: 'Private Subnet B'
+    Type: String
   KeyName:
     Description: 'Optional key pair of the ec2-user to establish a SSH connection to the SSH bastion host/instance.'
     Type: String
