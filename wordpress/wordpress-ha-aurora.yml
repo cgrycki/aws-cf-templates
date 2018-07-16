@@ -723,13 +723,13 @@ Resources:
         config:
           packages:
             yum:
-              php70: []
-              php70-gd: []
-              php70-opcache: []
-              php70-mysqlnd: []
-              php70-mbstring: []
-              mysql56: []
-              httpd24: []
+              php: []
+              php-gd: []
+              php-opcache: []
+              php-mysqlnd: []
+              php-mbstring: []
+              mariadb: []
+              httpd: []
           files:
             '/root/php.sh':
               content: !Sub |
