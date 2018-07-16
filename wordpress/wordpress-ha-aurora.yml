@@ -816,7 +816,6 @@ Resources:
     DependsOn:
     - EFSMountTargetA
     - EFSMountTargetB
-    - EFSMountTargetC
     Properties:
       TargetGroupARNs:
       - !Ref LoadBalancerTargetGroup
