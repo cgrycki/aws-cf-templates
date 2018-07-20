@@ -2,6 +2,12 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Pipeline to build API's using claudia inside a codebuild project
 Parameters:
+  ApplicationName:
+    Type: String
+    Description: Name of application from package.json
+  LambdaExecutionRoleName:
+    Type: String
+    Description: Name of IAM role that will be created for executing the lambda functions
   GitHubUser:
     Type: String
     Description: GitHub User
@@ -35,6 +41,11 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
+          default: Resources
+        Parameters:
+          - ApplicationName
+          - LambdaExecutionRoleName
+      - Label:
           default: GitHub Configuration
         Parameters:
           - GitHubToken
@@ -53,6 +64,10 @@ Metadata:
         Parameters:
           - EmailAddress
     ParameterLabels:
+      ApplicationName:
+        default: Application Name
+      LambdaExecutionRoleName:
+        default: Lambda Execution Role Name
       GitHubToken:
         default: GitHub OAuth2 Token
       GitHubUser:
@@ -70,6 +85,53 @@ Metadata:
       EmailAddress:
         default: E-Mail Address
 Resources:
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Join 
+            - '-'
+            - - !Ref LambdaExecutionRoleName
+              - policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogStream'
+                Resource:
+                  - !Sub >-
+                    arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ApplicationName}:*:*
+              - Effect: Allow
+                Action:
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub >-
+                    arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ApplicationName}:*:*
+              - Effect: Allow
+                Action:
+                  - 'dynamodb:DescribeTable'
+                  - 'dynamodb:Query'
+                  - 'dynamodb:Scan'
+                  - 'dynamodb:GetItem'
+                  - 'dynamodb:PutItem'
+                  - 'dynamodb:UpdateItem'
+                  - 'dynamodb:DeleteItem'
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:*:*'
+              - Effect: Allow
+                Action:
+                  - 'xray:PutTraceSegments'
+                  - 'xray:PutTelemetryRecords'
+                Resource: '*'
+      Path: /
+      RoleName: !Ref LambdaExecutionRoleName
   PipelineBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -78,6 +140,12 @@ Resources:
         Rules:
           - ExpirationInDays: 1
             Status: Enabled
+  ClaudiaUpdateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+  SecretsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
@@ -140,7 +208,7 @@ Resources:
           Version: '2012-10-17'
   CodeBuildBuildAPI:
     Type: AWS::CodeBuild::Project
-    DependsOn: CodeBuildRole
+    DependsOn: [CodeBuildRole, LambdaExecutionRole]
     Properties:
       Name: !Sub ${AWS::StackName}-BuildAPI
       Description: Build API with npm and claudia
@@ -153,24 +221,36 @@ Resources:
         Image: !Sub ${BuildImage}
       Source:
         Type: CODEPIPELINE
-        BuildSpec: !Sub |
-          version: 0.2
-          phases:
-            install:
-              commands:
-                - echo Install started on `date`
-                - npm install --save
-                - npm install claudia-api-builder --save
-                - npm install superb --save
-                - npm install -g claudia
-            build:
-              commands:
-                - echo Build started on `date`
-                - echo Nothing to build just yet...
-            post_build:
-              commands:
-                - echo Build completed on `date`
-      TimeoutInMinutes: 30
+        BuildSpec: !Sub 
+          - |
+            version: 0.2
+            phases:
+              install:
+                commands:
+                  - echo Install started on `date`
+                  - npm install --save
+              pre_build:
+                commands:
+                  - echo Get existing claudia config from S3 if it exists
+                  - config_exists=$(aws s3 ls s3://${ClaudiaUpdateBucket}/claudia.json); echo ''
+                  - if [ "$config_exists" ]; then aws s3 cp s3://${ClaudiaUpdateBucket}/claudia.json .; fi
+                  - echo Get secret .env file
+                  - aws s3 sync s3://${SecretsBucket} .
+                  - echo Make script executable
+                  - chmod +x bin/claudia-deploy.sh
+              build:
+                commands:
+                  - echo Build started on `date`
+                  - if [ -r claudia.json ]; then npm run update env.json; else npm run deploy env.json ${LocalLambdaExecutionRole}; fi
+              post_build:
+                commands:
+                  - echo Build completed on `date`
+                  - echo Store claudia config in S3
+                  - aws s3 cp claudia.json s3://${ClaudiaUpdateBucket}/claudia.json
+          - {
+            LocalLambdaExecutionRole: !GetAtt LambdaExecutionRole.Arn
+            }
+      TimeoutInMinutes: 20
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
@@ -193,9 +273,9 @@ Resources:
             Branch: !Ref GitHubBranch
             OAuthToken: !Ref GitHubToken
           RunOrder: 1
-      - Name: Build
+      - Name: Deploy
         Actions:
-        - Name: NPM_Build
+        - Name: NPM_Claudia_Deploy
           ActionTypeId:
             Category: Build
             Owner: AWS
@@ -260,3 +340,10 @@ Resources:
             InputPathsMap:
               pipeline: $.detail.pipeline
               state: $.detail.state
+Outputs:
+  PipelineUrl:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
+    Description: CodePipeline URL
+  SecretsBucket:
+    Value: !Sub s3://${SecretsBucket}
+    Description: Secrets Bucket
