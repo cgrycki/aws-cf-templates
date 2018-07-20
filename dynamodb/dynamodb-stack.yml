@@ -1,0 +1,223 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: A simple stack to create four DynamoDB tables
+Parameters:
+  TableName1:
+    Type: String
+    Description: Name of first table
+  TableName2:
+    Type: String
+    Description: Name of second table
+  TableName3:
+    Type: String
+    Description: Name of third table
+  TableName4:
+    Type: String
+    Description: Name of fourth table
+  KeyAttributeName1:
+    Type: String
+    Description: Name of attribute for the keys of the first table
+  KeyAttributeType1:
+    Type: String
+    Description: (S)tring, (N)umeric, or (B)inary
+    AllowedValues:
+      - 'S'
+      - 'N'
+      - 'B'
+  KeyAttributeName2:
+    Type: String
+    Description: Name of attribute for the keys of the second table
+  KeyAttributeType2:
+    Type: String
+    Description: (S)tring, (N)umeric, or (B)inary
+    AllowedValues:
+      - 'S'
+      - 'N'
+      - 'B'
+  KeyAttributeName3:
+    Type: String
+    Description: Name of attribute for the keys of the third table
+  KeyAttributeType3:
+    Type: String
+    Description: (S)tring, (N)umeric, or (B)inary
+    AllowedValues:
+      - 'S'
+      - 'N'
+      - 'B'
+  KeyAttributeName4:
+    Type: String
+    Description: Name of attribute for the keys of the fourth table
+  KeyAttributeType4:
+    Type: String
+    Description: (S)tring, (N)umeric, or (B)inary
+    AllowedValues:
+      - 'S'
+      - 'N'
+      - 'B'
+  ReadCapacityUnits:
+    Type: Number
+    Description: Read capacity units
+    Default: 5
+  WriteCapacityUnits:
+    Type: Number
+    Description: Write capacity units
+    Default: 5
+  ServerSideEncryption:
+    Type: String
+    Description: Server-side Encryption
+    Default: True
+    AllowedValues:
+      - True
+      - False
+  IAMGroups:
+    Type: CommaDelimitedList
+    Description: Comma delimited list of IAM groups that will be granted read/write access to tables
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Table Names
+        Parameters:
+          - TableName1
+          - TableName2
+          - TableName3
+          - TableName4
+      - Label:
+          default: Table Schema
+        Parameters:
+          - KeyAttributeName1
+          - KeyAttributeType1
+          - KeyAttributeName2
+          - KeyAttributeType2
+          - KeyAttributeName3
+          - KeyAttributeType3
+          - KeyAttributeName4
+          - KeyAttributeType4
+      - Label:
+          default: Performance
+        Parameters:
+          - ReadCapacityUnits
+          - WriteCapacityUnits
+    ParameterLabels:
+      KeyAttributeName:
+        default: Key Name
+      KeyAttributeType:
+        default: Key Data Type
+Resources:
+  DynamoDBTable1:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName1
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName1
+          AttributeType: !Ref KeyAttributeType1
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName1
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnits
+        WriteCapacityUnits: !Ref WriteCapacityUnits
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable2:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName2
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName2
+          AttributeType: !Ref KeyAttributeType2
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName2
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnits
+        WriteCapacityUnits: !Ref WriteCapacityUnits
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable3:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName3
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName3
+          AttributeType: !Ref KeyAttributeType3
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName3
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnits
+        WriteCapacityUnits: !Ref WriteCapacityUnits
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable4:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref TableName4
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName4
+          AttributeType: !Ref KeyAttributeType4
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName4
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnits
+        WriteCapacityUnits: !Ref WriteCapacityUnits
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  IAMPolicyReadWrite:
+    Type: AWS::IAM::Policy
+    Properties:
+      Groups: !Ref IAMGroups
+      PolicyName: dynamodb-tables-rw
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: 
+              - 'dynamodb:PutItem'
+              - 'dynamodb:BatchWriteItem'
+              - 'dynamodb:DescribeTable'
+              - 'dynamodb:DeleteItem'
+              - 'dynamodb:GetItem'
+              - 'dynamodb:BatchGetItem'
+              - 'dynamodb:Scan'
+              - 'dynamodb:Query'
+              - 'dynamodb:UpdateItem'
+            Resource:
+              - !GetAtt
+                - DynamoDBTable1
+                - Arn
+              - !GetAtt
+                - DynamoDBTable2
+                - Arn
+              - !GetAtt
+                - DynamoDBTable3
+                - Arn
+              - !GetAtt
+                - DynamoDBTable4
+                - Arn
+Outputs:
+  Table1:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable1
+        - Arn
+    Description: DynamoDBTable1 ARN
+  Table2:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable2
+        - Arn
+    Description: DynamoDBTable2 ARN
+  Table3:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable3
+        - Arn
+    Description: DynamoDBTable3 ARN
+  Table4:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable4
+        - 'Arn'
+    Description: DynamoDBTable4 ARN
