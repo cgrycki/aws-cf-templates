@@ -617,6 +617,15 @@ Resources:
       DistributionConfig:
         Comment: Distribution from an S3 Bucket for STAGE
         DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 86400
+            ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCachingMinTTL: 86400
+            ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
         Aliases:
           - !If [UseCustomDomainNameSTAGE, !Ref SiteCloudFrontNameSTAGE, !Ref 'AWS::NoValue']
         DefaultCacheBehavior:
@@ -643,12 +652,12 @@ Resources:
           !If
             - UseExistingCertSTAGE
             - AcmCertificateArn: !Ref AcmCertificateArnSTAGE
-              SSLSupportMethod: sni-only
+              SslSupportMethod: sni-only
               MinimumProtocolVersion: !Ref MinimumProtocolVersion
             - !If
               - RequestCertSTAGE
               - AcmCertificateArn: !Ref CertSTAGE
-                SSLSupportMethod: sni-only
+                SslSupportMethod: sni-only
                 MinimumProtocolVersion: !Ref MinimumProtocolVersion
               - CloudFrontDefaultCertificate: True
                 MinimumProtocolVersion: !Ref MinimumProtocolVersion
@@ -658,6 +667,15 @@ Resources:
       DistributionConfig:
         Comment: Distribution from an S3 Bucket for PROD
         DefaultRootObject: index.html
+        CustomErrorResponses:
+          - ErrorCachingMinTTL: 86400
+            ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCachingMinTTL: 86400
+            ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
         Aliases:
           - !If [UseCustomDomainNamePROD, !Ref SiteCloudFrontNamePROD, !Ref 'AWS::NoValue']
         DefaultCacheBehavior:
@@ -684,12 +702,12 @@ Resources:
           !If
             - UseExistingCertPROD
             - AcmCertificateArn: !Ref AcmCertificateArnPROD
-              SSLSupportMethod: sni-only
+              SslSupportMethod: sni-only
               MinimumProtocolVersion: !Ref MinimumProtocolVersion
             - !If
               - RequestCertPROD
               - AcmCertificateArn: !Ref CertPROD
-                SSLSupportMethod: sni-only
+                SslSupportMethod: sni-only
                 MinimumProtocolVersion: !Ref MinimumProtocolVersion
               - CloudFrontDefaultCertificate: True
                 MinimumProtocolVersion: !Ref MinimumProtocolVersion
