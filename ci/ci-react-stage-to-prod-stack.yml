@@ -46,13 +46,6 @@ Parameters:
       - PriceClass_100
       - PriceClass_200
       - PriceClass_300
-  RedirectURIVariableName:
-    Type: String
-    Description: Name of environment variable for the redirect URI
-    Default: RedirectURI
-  RedirectURI:
-    Type: String
-    Description: URL for your backend API gateway
   GitHubUser:
     Type: String
     Description: GitHub User
@@ -110,9 +103,6 @@ Metadata:
           - SiteCloudFrontPriceClassPROD
       - Label:
           default: Backend Integration
-        Parameters:
-          - RedirectURIVariableName
-          - RedirectURI
       - Label:
           default: GitHub Configuration
         Parameters:
@@ -150,10 +140,6 @@ Metadata:
         default: Price class for cloudfront distribution of STAGE
       SiteCloudFrontPriceClassPROD:
         default: Price class for cloudfront distribution of PRODUCTION
-      RedirectURIVariableName:
-        default: Redirect URI Variable Name
-      RedirectURI:
-        default: Redirect URI
       GitHubToken:
         default: GitHub OAuth2 Token
       GitHubUser: 
