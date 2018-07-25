@@ -14,12 +14,12 @@ Parameters:
   SiteValidationDomain:
     Type: String
     Description: FQDN for domain validation. Providing an argument to the parameter will cause an AWS cert to be requested. See https://docs.aws.amazon.com/acm/latest/APIReference/API_DomainValidationOption.html
-  IamCertificateIdSTAGE:
+  AcmCertificateArnSTAGE:
     Type: String
-    Description: Use this if you have imported your own certificate for STAGE. This ID is the ServerCertificateId value, which AWS Identity and Access Management (IAM) returns when the certificate is added to the IAM certificate store, such as ASCACKCEVSQ6CEXAMPLE1. 
-  IamCertificateIdPROD:
+    Description: Use this if you have imported your own certificate for STAGE. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
+  AcmCertificateArnPROD:
     Type: String
-    Description: Use this if you have imported your own certificate for PROD. This ID is the ServerCertificateId value, which AWS Identity and Access Management (IAM) returns when the certificate is added to the IAM certificate store, such as ASCACKCEVSQ6CEXAMPLE1. 
+    Description: Use this if you have imported your own certificate for PROD. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate.
   MinimumProtocolVersion:
     Type: String
     Description: See https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html#secure-connections-supported-ciphers
@@ -91,8 +91,8 @@ Conditions:
   UseCustomDomainNamePROD: !Not [!Equals [!Ref SiteCloudFrontNamePROD, '']]
   RequestCertSTAGE: !And [!Not [!Equals [!Ref SiteValidationDomain, '']], !Not [!Equals [!Ref SiteCloudFrontNameSTAGE, '']]]
   RequestCertPROD: !And [!Not [!Equals [!Ref SiteValidationDomain, '']], !Not [!Equals [!Ref SiteCloudFrontNamePROD, '']]]
-  UseExistingCertSTAGE: !And [!Not [!Equals [!Ref IamCertificateIdSTAGE, '']], !Not [!Equals [!Ref SiteCloudFrontNameSTAGE, '']]]
-  UseExistingCertPROD: !And [!Not [!Equals [!Ref IamCertificateIdPROD, '']], !Not [!Equals [!Ref SiteCloudFrontNamePROD, '']]]
+  UseExistingCertSTAGE: !And [!Not [!Equals [!Ref AcmCertificateArnSTAGE, '']], !Not [!Equals [!Ref SiteCloudFrontNameSTAGE, '']]]
+  UseExistingCertPROD: !And [!Not [!Equals [!Ref AcmCertificateArnPROD, '']], !Not [!Equals [!Ref SiteCloudFrontNamePROD, '']]]
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -103,8 +103,8 @@ Metadata:
           - SiteCloudFrontNameSTAGE
           - SiteCloudFrontNamePROD
           - SiteValidationDomain
-          - IamCertificateIdSTAGE
-          - IamCertificateIdPROD
+          - AcmCertificateArnSTAGE
+          - AcmCertificateArnPROD
           - MinimumProtocolVersion
           - SiteCloudFrontPriceClassSTAGE
           - SiteCloudFrontPriceClassPROD
@@ -140,10 +140,10 @@ Metadata:
         default: Site domain name for hosting PRODUCTION in cloudfront [Optional]
       SiteValidationDomain:
         default: FQDN for domain validation [Optional]
-      IamCertificateIdSTAGE:
-        default: IAM Certificate ID for STAGE [Optional]
-      IamCertificateIdPROD:
-        default: IAM Certificate ID for PROD [Optional]
+      AcmCertificateArnSTAGE:
+        default: ACM Certificate for STAGE [Optional]
+      AcmCertificateArnPROD:
+        default: ACM Certificate for PROD [Optional]
       MinimumProtocolVersion:
         default: Minimum SSL/TLS Protocol Version
       SiteCloudFrontPriceClassSTAGE:
@@ -656,7 +656,7 @@ Resources:
         ViewerCertificate:
           !If
             - UseExistingCertSTAGE
-            - IamCertificateId: !Ref IamCertificateIdSTAGE
+            - AcmCertificateArn: !Ref AcmCertificateArnSTAGE
               SSLSupportMethod: sni-only
               MinimumProtocolVersion: !Ref MinimumProtocolVersion
             - !If
@@ -697,7 +697,7 @@ Resources:
         ViewerCertificate:
           !If
             - UseExistingCertPROD
-            - IamCertificateId: !Ref IamCertificateIdPROD
+            - AcmCertificateArn: !Ref AcmCertificateArnPROD
               SSLSupportMethod: sni-only
               MinimumProtocolVersion: !Ref MinimumProtocolVersion
             - !If
