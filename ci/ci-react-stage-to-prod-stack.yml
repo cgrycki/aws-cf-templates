@@ -200,7 +200,8 @@ Resources:
             - codebuild:BatchGetBuilds
             - codebuild:StopBuild
             Resource:
-            - !GetAtt 'CodeBuildBuildSite.Arn'
+            - !GetAtt 'CodeBuildBuildSiteSTAGE.Arn'
+            - !GetAtt 'CodeBuildBuildSitePROD.Arn'
             - !GetAtt 'CodeBuildDeploySiteSTAGE.Arn'
             - !GetAtt 'CodeBuildDeploySitePROD.Arn'
             Effect: Allow
@@ -436,7 +437,7 @@ Resources:
           OutputArtifacts:
           - Name: BuildStageOutput
           Configuration:
-            ProjectName: !Ref CodeBuildBuildSite
+            ProjectName: !Ref CodeBuildBuildSiteSTAGE
           RunOrder: 1
       - Name: Deploy_Stage
         Actions:
@@ -478,7 +479,7 @@ Resources:
           OutputArtifacts:
           - Name: BuildProdOutput
           Configuration:
-            ProjectName: !Ref CodeBuildBuildSite
+            ProjectName: !Ref CodeBuildBuildSitePROD
           RunOrder: 1
       - Name: Deploy_Prod
         Actions:
