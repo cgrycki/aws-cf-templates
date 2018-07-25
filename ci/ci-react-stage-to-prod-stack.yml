@@ -253,7 +253,8 @@ Resources:
         !Join 
           - '-'
           - - !Ref SiteBucketName
-            - '-stage-secrets'
+            - 'stage'
+            - 'secrets'
   SecretsBucketPROD:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -262,7 +263,8 @@ Resources:
         !Join 
           - '-'
           - - !Ref SiteBucketName
-            - '-prod-secrets'
+            - 'prod'
+            - 'secrets'
   PipelineBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
