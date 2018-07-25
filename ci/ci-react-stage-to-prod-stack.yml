@@ -244,6 +244,24 @@ Resources:
         - ''
         - - !Ref SiteBucketName
           - '-prod'
+  SecretsBucketSTAGE:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName:
+        !Join 
+          - '-'
+          - - !Ref SiteBucketName
+            - '-stage-secrets'
+  SecretsBucketPROD:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName:
+        !Join 
+          - '-'
+          - - !Ref SiteBucketName
+            - '-prod-secrets'
   PipelineBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -252,11 +270,11 @@ Resources:
         Rules:
           - ExpirationInDays: 1
             Status: Enabled
-  CodeBuildBuildSite:
+  CodeBuildBuildSiteSTAGE:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
     Properties:
-      Name: !Sub ${AWS::StackName}-BuildSite
+      Name: !Sub ${AWS::StackName}-BuildSite-Stage
       Description: Build site with npm
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
@@ -274,6 +292,45 @@ Resources:
               commands:
                 - echo Install started on `date`
                 - npm install --save
+            pre_build:
+              commands:
+                - aws s3 sync s3://${SecretsBucketSTAGE} .
+            build:
+              commands:
+                - echo Build started on `date`
+                - npm run build
+            post_build:
+              commands:
+                - echo Build completed on `date`
+          artifacts:
+            files:
+              - '**/*'
+      TimeoutInMinutes: 15
+  CodeBuildBuildSitePROD:
+    Type: AWS::CodeBuild::Project
+    DependsOn: CodeBuildRole
+    Properties:
+      Name: !Sub ${AWS::StackName}-BuildSite-Prod
+      Description: Build site with npm
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: !Ref BuildType
+        ComputeType: !Ref BuildComputeType
+        Image: !Sub ${BuildImage}
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub |
+          version: 0.2
+          phases:
+            install:
+              commands:
+                - echo Install started on `date`
+                - npm install --save
+            pre_build:
+              commands:
+                - aws s3 sync s3://${SecretsBucketPROD} .
             build:
               commands:
                 - echo Build started on `date`
@@ -366,7 +423,7 @@ Resources:
             Branch: !Ref GitHubBranch
             OAuthToken: !Ref GitHubToken
           RunOrder: 1
-      - Name: Build
+      - Name: BuildStage
         Actions:
         - Name: NPM_Build
           ActionTypeId:
@@ -377,7 +434,7 @@ Resources:
           InputArtifacts:
           - Name: SourceOutput
           OutputArtifacts:
-          - Name: BuildOutput
+          - Name: BuildStageOutput
           Configuration:
             ProjectName: !Ref CodeBuildBuildSite
           RunOrder: 1
@@ -390,7 +447,7 @@ Resources:
             Version: '1'
             Provider: CodeBuild
           InputArtifacts:
-          - Name: BuildOutput
+          - Name: BuildStageOutput
           OutputArtifacts:
           - Name: StageOutput
           Configuration:
@@ -408,6 +465,21 @@ Resources:
             NotificationArn: !Ref DeveloperNotification
             CustomData: Approve new deployment of site in production.
           RunOrder: 1
+      - Name: BuildProd
+        Actions:
+        - Name: NPM_Build
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Version: '1'
+            Provider: 'CodeBuild'
+          InputArtifacts:
+          - Name: SourceOutput
+          OutputArtifacts:
+          - Name: BuildProdOutput
+          Configuration:
+            ProjectName: !Ref CodeBuildBuildSite
+          RunOrder: 1
       - Name: Deploy_Prod
         Actions:
         - Name: Deploy
@@ -417,7 +489,7 @@ Resources:
             Version: '1'
             Provider: CodeBuild
           InputArtifacts:
-          - Name: StageOutput
+          - Name: BuildProdOutput
           OutputArtifacts:
           - Name: ProdOutput
           Configuration:
