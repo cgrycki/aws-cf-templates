@@ -50,6 +50,7 @@ Metadata:
       Parameters:
       - WebServerKeyName
       - WebServerIAMUserSSHAccess
+      - WebServerIAMUserPrefix
       - WebServerInstanceType
       - WebServerLogsRetentionInDays
       - SubDomainName
@@ -131,6 +132,10 @@ Parameters:
     AllowedValues:
     - true
     - false
+  WebServerIAMUserPrefix:
+    Description: 'IAM users that start with this prefix and have a public SSH key will be granted SSH access to the web server. Leave blank to allow all IAM users to connect. This has no effect if WebServerIAMUserSSHAccess is set to false.'
+    Type: String
+    Default: ''
   WebServerInstanceType:
     Description: 'The instance type of web servers (e.g. t2.micro).'
     Type: String
@@ -563,7 +568,7 @@ Resources:
           - 'iam:ListSSHPublicKeys'
           - 'iam:GetSSHPublicKey'
           Resource:
-          - !Sub 'arn:aws:iam::${AWS::AccountId}:user/*'
+          - !Sub 'arn:aws:iam::${AWS::AccountId}:user/${WebServerIAMUserPrefix}*'
   LaunchConfiguration:
     DependsOn: [DatabaseA, DatabaseB]
     Type: 'AWS::AutoScaling::LaunchConfiguration'
@@ -721,6 +726,8 @@ Resources:
                 - 'a_configure_sshd_command'
                 - 'b_configure_sshd_commanduser'
         config:
+          sources:
+            /tmp/shibboleth: "https://s3.amazonaws.com/cph-shibboleth-sp-rpms/latest/shibboleth-sp.tar.gz"
           packages:
             yum:
               php: []
@@ -788,6 +795,9 @@ Resources:
             02_wordpress:
               command: '/root/wordpress.sh'
               cwd: '/var/www/html'
+            03_shibboleth-sp:
+              command: 'sudo yum localinstall -y "/tmp/shibboleth-sp/*.rpm"'
+              cwd: '/tmp/shibboleth-sp'
           services:
             sysvinit:
               httpd:
