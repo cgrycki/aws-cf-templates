@@ -308,6 +308,7 @@ Resources:
           artifacts:
             files:
               - '**/*'
+            base-directory: build
       TimeoutInMinutes: 15
   CodeBuildBuildSitePROD:
     Type: AWS::CodeBuild::Project
@@ -344,6 +345,7 @@ Resources:
           artifacts:
             files:
               - '**/*'
+            base-directory: build
       TimeoutInMinutes: 15
   CodeBuildDeploySiteSTAGE:
     Type: AWS::CodeBuild::Project
