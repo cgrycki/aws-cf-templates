@@ -1,22 +1,22 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Pipeline to deploy a react application to a stage environment, and after manual approval, to a prod environment.
+Description: Pipeline to deploy a react application to a dev environment, and after manual approval, to a prod environment.
 Parameters:
-  SiteBucketName:
+  BucketName:
     Type: String
-    Description: Name of bucket for website content. This stack will create separate stage and prod buckets, with -stage and -prod appended to the name specified here.
-  SiteCloudFrontNamePROD:
+    Description: Name of bucket for website content. This stack will create separate dev and prod buckets, with -dev and -prod appended to the name specified here.
+  CloudFrontNamePROD:
     Type: String
     Description: Full domain name for PRODUCTION site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
-  SiteCloudFrontNameSTAGE:
+  CloudFrontNameDEV:
     Type: String
-    Description: Full domain name for STAGE site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
-  SiteValidationDomain:
+    Description: Full domain name for DEV site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
+  ValidationDomain:
     Type: String
     Description: FQDN for domain validation. Providing an argument to the parameter will cause an AWS cert to be requested. See https://docs.aws.amazon.com/acm/latest/APIReference/API_DomainValidationOption.html
-  AcmCertificateArnSTAGE:
+  AcmCertificateArnDEV:
     Type: String
-    Description: Use this if you have imported your own certificate for STAGE. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
+    Description: Use this if you have imported your own certificate for DEV. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
   AcmCertificateArnPROD:
     Type: String
     Description: Use this if you have imported your own certificate for PROD. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate.
@@ -30,15 +30,15 @@ Parameters:
       - TLSv1_2016
       - TLSv1.1_2016
       - TLSv1.2_2018
-  SiteCloudFrontPriceClassSTAGE:
+  CloudFrontPriceClassDEV:
     Type: String
-    Description: Price class to use for cloudfront distribution of STAGE.
+    Description: Price class to use for cloudfront distribution of DEV.
     Default: PriceClass_100
     AllowedValues:
       - PriceClass_100
       - PriceClass_200
       - PriceClass_300
-  SiteCloudFrontPriceClassPROD:
+  CloudFrontPriceClassPROD:
     Type: String
     Description: Price class to use for cloudfront distribution of PRODUCTION.
     Default: PriceClass_100
@@ -78,29 +78,29 @@ Parameters:
     Description: The build image to use for deploying the app
   EmailAddress:
     Type: String
-    Description: E-Mail address that will receive pipeline state notifications and stage to prod approval requests.
+    Description: E-Mail address that will receive pipeline state notifications and dev to prod approval requests.
 Conditions:
-  UseCustomDomainNameSTAGE: !Not [!Equals [!Ref SiteCloudFrontNameSTAGE, '']]
-  UseCustomDomainNamePROD: !Not [!Equals [!Ref SiteCloudFrontNamePROD, '']]
-  RequestCertSTAGE: !And [!Not [!Equals [!Ref SiteValidationDomain, '']], !Not [!Equals [!Ref SiteCloudFrontNameSTAGE, '']]]
-  RequestCertPROD: !And [!Not [!Equals [!Ref SiteValidationDomain, '']], !Not [!Equals [!Ref SiteCloudFrontNamePROD, '']]]
-  UseExistingCertSTAGE: !And [!Not [!Equals [!Ref AcmCertificateArnSTAGE, '']], !Not [!Equals [!Ref SiteCloudFrontNameSTAGE, '']]]
-  UseExistingCertPROD: !And [!Not [!Equals [!Ref AcmCertificateArnPROD, '']], !Not [!Equals [!Ref SiteCloudFrontNamePROD, '']]]
+  UseCustomDomainNameDEV: !Not [!Equals [!Ref CloudFrontNameDEV, '']]
+  UseCustomDomainNamePROD: !Not [!Equals [!Ref CloudFrontNamePROD, '']]
+  RequestCertDEV: !And [!Not [!Equals [!Ref ValidationDomain, '']], !Not [!Equals [!Ref CloudFrontNameDEV, '']]]
+  RequestCertPROD: !And [!Not [!Equals [!Ref ValidationDomain, '']], !Not [!Equals [!Ref CloudFrontNamePROD, '']]]
+  UseExistingCertDEV: !And [!Not [!Equals [!Ref AcmCertificateArnDEV, '']], !Not [!Equals [!Ref CloudFrontNameDEV, '']]]
+  UseExistingCertPROD: !And [!Not [!Equals [!Ref AcmCertificateArnPROD, '']], !Not [!Equals [!Ref CloudFrontNamePROD, '']]]
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
           default: Site Configuration
         Parameters:
-          - SiteBucketName
-          - SiteCloudFrontNameSTAGE
-          - SiteCloudFrontNamePROD
-          - SiteValidationDomain
-          - AcmCertificateArnSTAGE
+          - BucketName
+          - CloudFrontNameDEV
+          - CloudFrontNamePROD
+          - ValidationDomain
+          - AcmCertificateArnDEV
           - AcmCertificateArnPROD
           - MinimumProtocolVersion
-          - SiteCloudFrontPriceClassSTAGE
-          - SiteCloudFrontPriceClassPROD
+          - CloudFrontPriceClassDEV
+          - CloudFrontPriceClassPROD
       - Label:
           default: Backend Integration
       - Label:
@@ -122,23 +122,23 @@ Metadata:
         Parameters:
           - EmailAddress
     ParameterLabels:
-      SiteBucketName:
+      BucketName:
         default: Name of S3 Bucket for website content
-      SiteCloudFrontNameSTAGE:
-        default: Site domain name for hosting STAGE in cloudfront [Optional]
-      SiteCloudFrontNamePROD:
+      CloudFrontNameDEV:
+        default: Site domain name for hosting DEV in cloudfront [Optional]
+      CloudFrontNamePROD:
         default: Site domain name for hosting PRODUCTION in cloudfront [Optional]
-      SiteValidationDomain:
+      ValidationDomain:
         default: FQDN for domain validation [Optional]
-      AcmCertificateArnSTAGE:
-        default: ACM Certificate for STAGE [Optional]
+      AcmCertificateArnDEV:
+        default: ACM Certificate for DEV [Optional]
       AcmCertificateArnPROD:
         default: ACM Certificate for PROD [Optional]
       MinimumProtocolVersion:
         default: Minimum SSL/TLS Protocol Version
-      SiteCloudFrontPriceClassSTAGE:
-        default: Price class for cloudfront distribution of STAGE
-      SiteCloudFrontPriceClassPROD:
+      CloudFrontPriceClassDEV:
+        default: Price class for cloudfront distribution of DEV
+      CloudFrontPriceClassPROD:
         default: Price class for cloudfront distribution of PRODUCTION
       GitHubToken:
         default: GitHub OAuth2 Token
@@ -200,10 +200,10 @@ Resources:
             - codebuild:BatchGetBuilds
             - codebuild:StopBuild
             Resource:
-            - !GetAtt 'CodeBuildBuildSiteSTAGE.Arn'
-            - !GetAtt 'CodeBuildBuildSitePROD.Arn'
-            - !GetAtt 'CodeBuildDeploySiteSTAGE.Arn'
-            - !GetAtt 'CodeBuildDeploySitePROD.Arn'
+            - !GetAtt 'CodeBuildBuildDEV.Arn'
+            - !GetAtt 'CodeBuildBuildPROD.Arn'
+            - !GetAtt 'CodeBuildDeployDEV.Arn'
+            - !GetAtt 'CodeBuildDeployPROD.Arn'
             Effect: Allow
           - Action:
             - s3:GetObject
@@ -227,33 +227,33 @@ Resources:
             - !Ref DeveloperNotification
             Effect: Allow
           Version: '2012-10-17'
-  SiteBucketSTAGE:
+  BucketDEV:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
       BucketName: 
         !Join
           - ''
-          - - !Ref SiteBucketName
-            - '-stage'
-  SiteBucketPROD:
+          - - !Ref BucketName
+            - '-dev'
+  BucketPROD:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
       BucketName: 
         !Join
         - ''
-        - - !Ref SiteBucketName
+        - - !Ref BucketName
           - '-prod'
-  SecretsBucketSTAGE:
+  SecretsBucketDEV:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
       BucketName:
         !Join 
           - '-'
-          - - !Ref SiteBucketName
-            - 'stage'
+          - - !Ref BucketName
+            - 'dev'
             - 'secrets'
   SecretsBucketPROD:
     Type: AWS::S3::Bucket
@@ -262,7 +262,7 @@ Resources:
       BucketName:
         !Join 
           - '-'
-          - - !Ref SiteBucketName
+          - - !Ref BucketName
             - 'prod'
             - 'secrets'
   PipelineBucket:
@@ -273,11 +273,11 @@ Resources:
         Rules:
           - ExpirationInDays: 1
             Status: Enabled
-  CodeBuildBuildSiteSTAGE:
+  CodeBuildBuildDEV:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
     Properties:
-      Name: !Sub ${AWS::StackName}-BuildSite-Stage
+      Name: !Sub ${AWS::StackName}-Build-Dev
       Description: Build site with npm
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
@@ -297,7 +297,7 @@ Resources:
                 - npm install --save
             pre_build:
               commands:
-                - aws s3 sync s3://${SecretsBucketSTAGE} .
+                - aws s3 sync s3://${SecretsBucketDEV} .
             build:
               commands:
                 - echo Build started on `date`
@@ -310,11 +310,11 @@ Resources:
               - '**/*'
             base-directory: build
       TimeoutInMinutes: 15
-  CodeBuildBuildSitePROD:
+  CodeBuildBuildPROD:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
     Properties:
-      Name: !Sub ${AWS::StackName}-BuildSite-Prod
+      Name: !Sub ${AWS::StackName}-Build-Prod
       Description: Build site with npm
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
@@ -347,11 +347,11 @@ Resources:
               - '**/*'
             base-directory: build
       TimeoutInMinutes: 15
-  CodeBuildDeploySiteSTAGE:
+  CodeBuildDeployDEV:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
     Properties:
-      Name: !Sub ${AWS::StackName}-DeploySiteSTAGE
+      Name: !Sub ${AWS::StackName}-DeployDEV
       Description: Deploy site to S3 and CloudFront
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
@@ -361,8 +361,8 @@ Resources:
         ComputeType: !Ref BuildComputeType
         Image: !Sub ${DeployImage}
         EnvironmentVariables:
-          - Name: CloudFrontDistributionIdSTAGE
-            Value: !Ref CloudFrontDistributionSTAGE
+          - Name: CloudFrontDistributionIdDEV
+            Value: !Ref CloudFrontDistributionDEV
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -371,18 +371,18 @@ Resources:
             build:
               commands:
                 - echo Deploying site to S3
-                - aws s3 sync . s3://${SiteBucketName}-stage --delete --acl public-read
+                - aws s3 sync . s3://${BucketName}-dev --delete --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionIdSTAGE --paths '/*'
+                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionIdDEV --paths '/*'
           artifacts:
             files:
               - '**/*'
       TimeoutInMinutes: 10
-  CodeBuildDeploySitePROD:
+  CodeBuildDeployPROD:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
     Properties:
-      Name: !Sub ${AWS::StackName}-DeploySitePROD
+      Name: !Sub ${AWS::StackName}-DeployPROD
       Description: Deploy site to S3 and CloudFront
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
@@ -402,7 +402,7 @@ Resources:
             build:
               commands:
                 - echo Deploying site to S3
-                - aws s3 sync . s3://${SiteBucketName}-prod --delete --acl public-read
+                - aws s3 sync . s3://${BucketName}-prod --delete --acl public-read
                 - echo Invalidating all files in cloudfront cache
                 - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionIdPROD --paths '/*'
       TimeoutInMinutes: 10
@@ -428,7 +428,7 @@ Resources:
             Branch: !Ref GitHubBranch
             OAuthToken: !Ref GitHubToken
           RunOrder: 1
-      - Name: BuildStage
+      - Name: BuildDev
         Actions:
         - Name: NPM_Build
           ActionTypeId:
@@ -439,11 +439,11 @@ Resources:
           InputArtifacts:
           - Name: SourceOutput
           OutputArtifacts:
-          - Name: BuildStageOutput
+          - Name: BuildDevOutput
           Configuration:
-            ProjectName: !Ref CodeBuildBuildSiteSTAGE
+            ProjectName: !Ref CodeBuildBuildDEV
           RunOrder: 1
-      - Name: Deploy_Stage
+      - Name: Deploy_Dev
         Actions:
         - Name: Deploy
           ActionTypeId:
@@ -452,11 +452,11 @@ Resources:
             Version: '1'
             Provider: CodeBuild
           InputArtifacts:
-          - Name: BuildStageOutput
+          - Name: BuildDevOutput
           OutputArtifacts:
-          - Name: StageOutput
+          - Name: DevOutput
           Configuration:
-            ProjectName: !Ref CodeBuildDeploySiteSTAGE
+            ProjectName: !Ref CodeBuildDeployDEV
           RunOrder: 1
       - Name: ProdApproval
         Actions:
@@ -483,7 +483,7 @@ Resources:
           OutputArtifacts:
           - Name: BuildProdOutput
           Configuration:
-            ProjectName: !Ref CodeBuildBuildSitePROD
+            ProjectName: !Ref CodeBuildBuildPROD
           RunOrder: 1
       - Name: Deploy_Prod
         Actions:
@@ -498,7 +498,7 @@ Resources:
           OutputArtifacts:
           - Name: ProdOutput
           Configuration:
-            ProjectName: !Ref CodeBuildDeploySitePROD
+            ProjectName: !Ref CodeBuildDeployPROD
           RunOrder: 1
       ArtifactStore:
         Type: S3
@@ -554,10 +554,10 @@ Resources:
             InputPathsMap:
               pipeline: $.detail.pipeline
               state: $.detail.state
-  SiteDeploymentEventRuleSTAGE:
+  DeploymentEventRuleDEV:
     Type: AWS::Events::Rule
     Properties:
-      Description: Send a notification when the STAGE site is successfully deployed
+      Description: Send a notification when the DEV site is successfully deployed
       EventPattern:
         source:
         - aws.codebuild
@@ -567,30 +567,30 @@ Resources:
           build-status:
             - SUCCEEDED
           project-name:
-          - !Ref CodeBuildDeploySiteSTAGE
+          - !Ref CodeBuildDeployDEV
       State: ENABLED
       Targets:
         - Arn: !Ref 'DeveloperNotification'
-          Id: CodeBuild_DeploySite_NotificationSTAGE
+          Id: CodeBuild_Deploy_NotificationDEV
           Input:
             !Join
               - ''
               - - '"'
-                - 'The STAGE site has been updated. URL: '
+                - 'The DEV site has been updated. URL: '
                 - !Join
                   - ''
                   - - 'https://'
-                    - !GetAtt [CloudFrontDistributionSTAGE, DomainName]
+                    - !GetAtt [CloudFrontDistributionDEV, DomainName]
                 - !If 
-                  - UseCustomDomainNameSTAGE
+                  - UseCustomDomainNameDEV
                   - !Join 
                     - ' '
                     - - ''
                       - 'Alternative URL:'
-                      - !Ref SiteCloudFrontNameSTAGE
+                      - !Ref CloudFrontNameDEV
                   - !Ref 'AWS::NoValue'
                 - '"'
-  SiteDeploymentEventRulePROD:
+  DeploymentEventRulePROD:
     Type: AWS::Events::Rule
     Properties:
       Description: Send a notification when the PROD site is successfully deployed
@@ -603,11 +603,11 @@ Resources:
           build-status:
             - SUCCEEDED
           project-name:
-          - !Ref CodeBuildDeploySitePROD
+          - !Ref CodeBuildDeployPROD
       State: ENABLED
       Targets:
         - Arn: !Ref 'DeveloperNotification'
-          Id: CodeBuild_DeploySite_NotificationPROD
+          Id: CodeBuild_Deploy_NotificationPROD
           Input:
             !Join
               - ''
@@ -623,23 +623,23 @@ Resources:
                     - ' '
                     - - ''
                       - 'Alternative URL:'
-                      - !Ref SiteCloudFrontNamePROD
+                      - !Ref CloudFrontNamePROD
                   - !Ref 'AWS::NoValue'
                 - '"'
-  CloudFrontOriginAccessIdentitySTAGE:
+  CloudFrontOriginAccessIdentityDEV:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: Used to retrieve content from S3 STAGE Bucket
+        Comment: Used to retrieve content from S3 DEV Bucket
   CloudFrontOriginAccessIdentityPROD:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
         Comment: Used to retrieve content from S3 PROD Bucket
-  SiteBucketCloudFrontPolicySTAGE:
+  BucketCloudFrontPolicyDEV:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref SiteBucketSTAGE
+      Bucket: !Ref BucketDEV
       PolicyDocument:
         Statement:
           - Sid: 'CloudFrontGetObject'
@@ -650,22 +650,22 @@ Resources:
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref SiteBucketSTAGE
+                  - !Ref BucketDEV
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref SiteBucketSTAGE
+                  - !Ref BucketDEV
                   - '/*'
             Principal:
               AWS:
                 !Join
                   - ' '
                   - - 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity'
-                    - !Ref CloudFrontOriginAccessIdentitySTAGE
-  SiteBucketCloudFrontPolicyPROD:
+                    - !Ref CloudFrontOriginAccessIdentityDEV
+  BucketCloudFrontPolicyPROD:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref SiteBucketPROD
+      Bucket: !Ref BucketPROD
       PolicyDocument:
         Statement:
           - Sid: 'CloudFrontGetObject'
@@ -676,11 +676,11 @@ Resources:
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref SiteBucketPROD
+                  - !Ref BucketPROD
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref SiteBucketPROD
+                  - !Ref BucketPROD
                   - '/*'
             Principal:
               AWS:
@@ -688,11 +688,11 @@ Resources:
                   - ' '
                   - - 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity'
                     - !Ref CloudFrontOriginAccessIdentityPROD
-  CloudFrontDistributionSTAGE:
+  CloudFrontDistributionDEV:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: Distribution from an S3 Bucket for STAGE
+        Comment: Distribution from an S3 Bucket for DEV
         DefaultRootObject: index.html
         CustomErrorResponses:
           - ErrorCachingMinTTL: 86400
@@ -704,7 +704,7 @@ Resources:
             ResponseCode: 200
             ResponsePagePath: /index.html
         Aliases:
-          - !If [UseCustomDomainNameSTAGE, !Ref SiteCloudFrontNameSTAGE, !Ref 'AWS::NoValue']
+          - !If [UseCustomDomainNameDEV, !Ref CloudFrontNameDEV, !Ref 'AWS::NoValue']
         DefaultCacheBehavior:
           Compress: True
           ForwardedValues:
@@ -715,7 +715,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
         Enabled: True
         Origins:
-          - DomainName: !GetAtt SiteBucketSTAGE.DomainName
+          - DomainName: !GetAtt BucketDEV.DomainName
             Id: s3-origin
             S3OriginConfig:
               OriginAccessIdentity:
@@ -723,17 +723,17 @@ Resources:
                   - '/'
                   - - 'origin-access-identity'
                     - 'cloudfront'
-                    - !Ref CloudFrontOriginAccessIdentitySTAGE
-        PriceClass: !Ref SiteCloudFrontPriceClassSTAGE
+                    - !Ref CloudFrontOriginAccessIdentityDEV
+        PriceClass: !Ref CloudFrontPriceClassDEV
         ViewerCertificate:
           !If
-            - UseExistingCertSTAGE
-            - AcmCertificateArn: !Ref AcmCertificateArnSTAGE
+            - UseExistingCertDEV
+            - AcmCertificateArn: !Ref AcmCertificateArnDEV
               SslSupportMethod: sni-only
               MinimumProtocolVersion: !Ref MinimumProtocolVersion
             - !If
-              - RequestCertSTAGE
-              - AcmCertificateArn: !Ref CertSTAGE
+              - RequestCertDEV
+              - AcmCertificateArn: !Ref CertDEV
                 SslSupportMethod: sni-only
                 MinimumProtocolVersion: !Ref MinimumProtocolVersion
               - CloudFrontDefaultCertificate: True
@@ -754,7 +754,7 @@ Resources:
             ResponseCode: 200
             ResponsePagePath: /index.html
         Aliases:
-          - !If [UseCustomDomainNamePROD, !Ref SiteCloudFrontNamePROD, !Ref 'AWS::NoValue']
+          - !If [UseCustomDomainNamePROD, !Ref CloudFrontNamePROD, !Ref 'AWS::NoValue']
         DefaultCacheBehavior:
           Compress: True
           ForwardedValues:
@@ -765,7 +765,7 @@ Resources:
           ViewerProtocolPolicy: redirect-to-https
         Enabled: True
         Origins:
-          - DomainName: !GetAtt SiteBucketPROD.DomainName
+          - DomainName: !GetAtt BucketPROD.DomainName
             Id: s3-origin
             S3OriginConfig:
               OriginAccessIdentity:
@@ -774,7 +774,7 @@ Resources:
                   - - 'origin-access-identity'
                     - 'cloudfront'
                     - !Ref CloudFrontOriginAccessIdentityPROD
-        PriceClass: !Ref SiteCloudFrontPriceClassPROD
+        PriceClass: !Ref CloudFrontPriceClassPROD
         ViewerCertificate:
           !If
             - UseExistingCertPROD
@@ -788,34 +788,34 @@ Resources:
                 MinimumProtocolVersion: !Ref MinimumProtocolVersion
               - CloudFrontDefaultCertificate: True
                 MinimumProtocolVersion: !Ref MinimumProtocolVersion
-  CertSTAGE:
+  CertDEV:
     Type: AWS::CertificateManager::Certificate
-    Condition: RequestCertSTAGE
+    Condition: RequestCertDEV
     Properties:
-      DomainName: !Ref SiteCloudFrontNameSTAGE
+      DomainName: !Ref CloudFrontNameDEV
       DomainValidationOptions:
-        - DomainName: !Ref SiteCloudFrontNameSTAGE
-          ValidationDomain: !Ref SiteValidationDomain
+        - DomainName: !Ref CloudFrontNameDEV
+          ValidationDomain: !Ref ValidationDomain
   CertPROD:
     Type: AWS::CertificateManager::Certificate
     Condition: RequestCertPROD
     Properties:
-      DomainName: !Ref SiteCloudFrontNamePROD
+      DomainName: !Ref CloudFrontNamePROD
       DomainValidationOptions:
-        - DomainName: !Ref SiteCloudFrontNamePROD
-          ValidationDomain: !Ref SiteValidationDomain
+        - DomainName: !Ref CloudFrontNamePROD
+          ValidationDomain: !Ref ValidationDomain
 Outputs:
   PipelineUrl:
     Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
     Description: CodePipeline URL
-  SiteUrlSTAGE:
+  UrlDEV:
     Value: 
       !Join
         - ''
         - - 'https://'
-          - !GetAtt [CloudFrontDistributionSTAGE, DomainName]
-    Description: STAGE Website URL
-  SiteUrlPROD:
+          - !GetAtt [CloudFrontDistributionDEV, DomainName]
+    Description: DEV Website URL
+  UrlPROD:
     Value: 
       !Join
         - ''
