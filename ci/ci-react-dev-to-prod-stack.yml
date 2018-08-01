@@ -2,24 +2,21 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Pipeline to deploy a react application to a dev environment, and after manual approval, to a prod environment.
 Parameters:
-  BucketName:
-    Type: String
-    Description: Name of bucket for website content. This stack will create separate dev and prod buckets, with -dev and -prod appended to the name specified here.
   CloudFrontNamePROD:
     Type: String
-    Description: Full domain name for PRODUCTION site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
+    Description: Full domain name for PROD site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
   CloudFrontNameDEV:
     Type: String
     Description: Full domain name for DEV site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
   ValidationDomain:
     Type: String
     Description: FQDN for domain validation. Providing an argument to the parameter will cause an AWS cert to be requested. See https://docs.aws.amazon.com/acm/latest/APIReference/API_DomainValidationOption.html
-  AcmCertificateArnDEV:
-    Type: String
-    Description: Use this if you have imported your own certificate for DEV. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate. 
   AcmCertificateArnPROD:
     Type: String
-    Description: Use this if you have imported your own certificate for PROD. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate.
+    Description: Use this if you have imported your own SSL certificate for PROD. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate.
+  AcmCertificateArnDEV:
+    Type: String
+    Description: Use this if you have imported your own SSL certificate for DEV. This ID is the Amazon Resource Name (ARN) of an AWS Certificate Manager (ACM) certificate.
   MinimumProtocolVersion:
     Type: String
     Description: See https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html#secure-connections-supported-ciphers
@@ -30,17 +27,9 @@ Parameters:
       - TLSv1_2016
       - TLSv1.1_2016
       - TLSv1.2_2018
-  CloudFrontPriceClassDEV:
+  CloudFrontPriceClass:
     Type: String
-    Description: Price class to use for cloudfront distribution of DEV.
-    Default: PriceClass_100
-    AllowedValues:
-      - PriceClass_100
-      - PriceClass_200
-      - PriceClass_300
-  CloudFrontPriceClassPROD:
-    Type: String
-    Description: Price class to use for cloudfront distribution of PRODUCTION.
+    Description: Price class to use for cloudfront distributions.
     Default: PriceClass_100
     AllowedValues:
       - PriceClass_100
@@ -92,17 +81,13 @@ Metadata:
       - Label:
           default: Site Configuration
         Parameters:
-          - BucketName
-          - CloudFrontNameDEV
           - CloudFrontNamePROD
+          - CloudFrontNameDEV
           - ValidationDomain
-          - AcmCertificateArnDEV
           - AcmCertificateArnPROD
+          - AcmCertificateArnDEV
           - MinimumProtocolVersion
-          - CloudFrontPriceClassDEV
-          - CloudFrontPriceClassPROD
-      - Label:
-          default: Backend Integration
+          - CloudFrontPriceClass
       - Label:
           default: GitHub Configuration
         Parameters:
@@ -122,24 +107,20 @@ Metadata:
         Parameters:
           - EmailAddress
     ParameterLabels:
-      BucketName:
-        default: Name of S3 Bucket for website content
-      CloudFrontNameDEV:
-        default: Site domain name for hosting DEV in cloudfront [Optional]
       CloudFrontNamePROD:
-        default: Site domain name for hosting PRODUCTION in cloudfront [Optional]
+        default: Domain for PROD environment in cloudfront [Optional]
+      CloudFrontNameDEV:
+        default: Domain for DEV environment in cloudfront [Optional]
       ValidationDomain:
         default: FQDN for domain validation [Optional]
-      AcmCertificateArnDEV:
-        default: ACM Certificate for DEV [Optional]
       AcmCertificateArnPROD:
-        default: ACM Certificate for PROD [Optional]
+        default: SSL Certificate for PROD in ACM [Optional]
+      AcmCertificateArnDEV:
+        default: SSL Certificate for DEV in ACM [Optional]
       MinimumProtocolVersion:
         default: Minimum SSL/TLS Protocol Version
-      CloudFrontPriceClassDEV:
-        default: Price class for cloudfront distribution of DEV
-      CloudFrontPriceClassPROD:
-        default: Price class for cloudfront distribution of PRODUCTION
+      CloudFrontPriceClass:
+        default: Price class for cloudfront distribution
       GitHubToken:
         default: GitHub OAuth2 Token
       GitHubUser: 
@@ -227,43 +208,19 @@ Resources:
             - !Ref DeveloperNotification
             Effect: Allow
           Version: '2012-10-17'
-  BucketDEV:
+  WebsiteBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
-      BucketName: 
-        !Join
-          - ''
-          - - !Ref BucketName
-            - '-dev'
-  BucketPROD:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
-    Properties:
-      BucketName: 
-        !Join
-        - ''
-        - - !Ref BucketName
-          - '-prod'
-  SecretsBucketDEV:
+      BucketName: !Ref AWS::StackName
+  SecretsBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
       BucketName:
         !Join 
           - '-'
-          - - !Ref BucketName
-            - 'dev'
-            - 'secrets'
-  SecretsBucketPROD:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
-    Properties:
-      BucketName:
-        !Join 
-          - '-'
-          - - !Ref BucketName
-            - 'prod'
+          - - !Ref AWS::StackName
             - 'secrets'
   PipelineBucket:
     Type: AWS::S3::Bucket
@@ -273,6 +230,11 @@ Resources:
         Rules:
           - ExpirationInDays: 1
             Status: Enabled
+      BucketName:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'pipeline'
   CodeBuildBuildDEV:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
@@ -297,7 +259,7 @@ Resources:
                 - npm install --save
             pre_build:
               commands:
-                - aws s3 sync s3://${SecretsBucketDEV} .
+                - aws s3 sync s3://${SecretsBucket}/dev .
             build:
               commands:
                 - echo Build started on `date`
@@ -334,7 +296,7 @@ Resources:
                 - npm install --save
             pre_build:
               commands:
-                - aws s3 sync s3://${SecretsBucketPROD} .
+                - aws s3 sync s3://${SecretsBucket}/prod .
             build:
               commands:
                 - echo Build started on `date`
@@ -361,7 +323,7 @@ Resources:
         ComputeType: !Ref BuildComputeType
         Image: !Sub ${DeployImage}
         EnvironmentVariables:
-          - Name: CloudFrontDistributionIdDEV
+          - Name: CloudFrontDistributionId
             Value: !Ref CloudFrontDistributionDEV
       Source:
         Type: CODEPIPELINE
@@ -371,9 +333,9 @@ Resources:
             build:
               commands:
                 - echo Deploying site to S3
-                - aws s3 sync . s3://${BucketName}-dev --delete --acl public-read
+                - aws s3 sync . s3://${AWS::StackName}/dev --delete --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionIdDEV --paths '/*'
+                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
           artifacts:
             files:
               - '**/*'
@@ -392,7 +354,7 @@ Resources:
         ComputeType: !Ref BuildComputeType
         Image: !Sub ${DeployImage}
         EnvironmentVariables:
-          - Name: CloudFrontDistributionIdPROD
+          - Name: CloudFrontDistributionId
             Value: !Ref CloudFrontDistributionPROD
       Source:
         Type: CODEPIPELINE
@@ -402,13 +364,18 @@ Resources:
             build:
               commands:
                 - echo Deploying site to S3
-                - aws s3 sync . s3://${BucketName}-prod --delete --acl public-read
+                - aws s3 sync . s3://${AWS::StackName}/prod --delete --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionIdPROD --paths '/*'
+                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
       TimeoutInMinutes: 10
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
     Properties:
+      Name: 
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'pipeline'
       RoleArn: !GetAtt CodePipelineRole.Arn
       Stages:
       - Name: Source
@@ -428,7 +395,7 @@ Resources:
             Branch: !Ref GitHubBranch
             OAuthToken: !Ref GitHubToken
           RunOrder: 1
-      - Name: BuildDev
+      - Name: Build_Dev
         Actions:
         - Name: NPM_Build
           ActionTypeId:
@@ -470,7 +437,7 @@ Resources:
             NotificationArn: !Ref DeveloperNotification
             CustomData: Approve new deployment of site in production.
           RunOrder: 1
-      - Name: BuildProd
+      - Name: Build_Prod
         Actions:
         - Name: NPM_Build
           ActionTypeId:
@@ -523,12 +490,22 @@ Resources:
   DeveloperNotification:
     Type: AWS::SNS::Topic
     Properties:
+      TopicName:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'DeveloperNotification'
       Subscription:
       - Endpoint: !Ref EmailAddress
         Protocol: email
   PipelineEventRule: 
     Type: AWS::Events::Rule
-    Properties: 
+    Properties:
+      Name:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'PipelineEventRule'
       Description: Send a notification about the pipeline state
       EventPattern: 
         source:
@@ -557,6 +534,12 @@ Resources:
   DeploymentEventRuleDEV:
     Type: AWS::Events::Rule
     Properties:
+      Name:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'DeploymentEventRule'
+            - 'DEV'
       Description: Send a notification when the DEV site is successfully deployed
       EventPattern:
         source:
@@ -581,18 +564,28 @@ Resources:
                   - ''
                   - - 'https://'
                     - !GetAtt [CloudFrontDistributionDEV, DomainName]
+                    - '/dev'
                 - !If 
                   - UseCustomDomainNameDEV
                   - !Join 
                     - ' '
                     - - ''
                       - 'Alternative URL:'
-                      - !Ref CloudFrontNameDEV
+                      - !Join
+                        - ''
+                        - - 'https://'
+                          - !Ref CloudFrontNameDEV
                   - !Ref 'AWS::NoValue'
                 - '"'
   DeploymentEventRulePROD:
     Type: AWS::Events::Rule
     Properties:
+      Name:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'DeploymentEventRule'
+            - 'PROD'
       Description: Send a notification when the PROD site is successfully deployed
       EventPattern:
         source:
@@ -623,26 +616,39 @@ Resources:
                     - ' '
                     - - ''
                       - 'Alternative URL:'
-                      - !Ref CloudFrontNamePROD
+                      - !Join
+                        - ''
+                        - - 'https://'
+                          - !Ref CloudFrontNamePROD
                   - !Ref 'AWS::NoValue'
                 - '"'
   CloudFrontOriginAccessIdentityDEV:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: Used to retrieve content from S3 DEV Bucket
+        Comment:
+          !Join
+            - ''
+            - - 'Used to retrieve content from '
+              - !Ref AWS::StackName
+              - '/dev'
   CloudFrontOriginAccessIdentityPROD:
     Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
     Properties:
       CloudFrontOriginAccessIdentityConfig:
-        Comment: Used to retrieve content from S3 PROD Bucket
-  BucketCloudFrontPolicyDEV:
+        Comment: 
+          !Join
+            - ''
+            - - 'Used to retrieve content from '
+              - !Ref AWS::StackName
+              - '/prod'
+  WebsiteBucketCloudFrontPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref BucketDEV
+      Bucket: !Ref WebsiteBucket
       PolicyDocument:
         Statement:
-          - Sid: 'CloudFrontGetObject'
+          - Sid: 'CloudFrontGetObject-DEV'
             Action: 
             - s3:GetObject
             Effect: Allow
@@ -650,25 +656,24 @@ Resources:
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref BucketDEV
+                  - !Ref WebsiteBucket
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref BucketDEV
-                  - '/*'
+                  - !Ref WebsiteBucket
+                  - '/dev'
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref WebsiteBucket
+                  - '/dev/*'
             Principal:
               AWS:
                 !Join
                   - ' '
                   - - 'arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity'
                     - !Ref CloudFrontOriginAccessIdentityDEV
-  BucketCloudFrontPolicyPROD:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref BucketPROD
-      PolicyDocument:
-        Statement:
-          - Sid: 'CloudFrontGetObject'
+          - Sid: 'CloudFrontGetObject-PROD'
             Action: 
             - s3:GetObject
             Effect: Allow
@@ -676,12 +681,17 @@ Resources:
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref BucketPROD
+                  - !Ref WebsiteBucket
               - !Join
                 - ''
                 - - 'arn:aws:s3:::'
-                  - !Ref BucketPROD
-                  - '/*'
+                  - !Ref WebsiteBucket
+                  - '/prod'
+              - !Join
+                - ''
+                - - 'arn:aws:s3:::'
+                  - !Ref WebsiteBucket
+                  - '/prod/*'
             Principal:
               AWS:
                 !Join
@@ -692,7 +702,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: Distribution from an S3 Bucket for DEV
+        Comment: cphb-events DEV environment
         DefaultRootObject: index.html
         CustomErrorResponses:
           - ErrorCachingMinTTL: 86400
@@ -711,12 +721,21 @@ Resources:
             QueryString: False
             Cookies:
               Forward: none
-          TargetOriginId: s3-origin
+          TargetOriginId:
+            !Join
+              - '/'
+              - - !Ref AWS::StackName
+                - 'dev'
           ViewerProtocolPolicy: redirect-to-https
         Enabled: True
         Origins:
-          - DomainName: !GetAtt BucketDEV.DomainName
-            Id: s3-origin
+          - DomainName: !GetAtt WebsiteBucket.DomainName
+            OriginPath: '/dev'
+            Id:
+              !Join
+                - '/'
+                - - !Ref AWS::StackName
+                  - 'dev'
             S3OriginConfig:
               OriginAccessIdentity:
                 !Join
@@ -724,7 +743,7 @@ Resources:
                   - - 'origin-access-identity'
                     - 'cloudfront'
                     - !Ref CloudFrontOriginAccessIdentityDEV
-        PriceClass: !Ref CloudFrontPriceClassDEV
+        PriceClass: !Ref CloudFrontPriceClass
         ViewerCertificate:
           !If
             - UseExistingCertDEV
@@ -742,7 +761,7 @@ Resources:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
-        Comment: Distribution from an S3 Bucket for PROD
+        Comment: cphb-events PROD environment
         DefaultRootObject: index.html
         CustomErrorResponses:
           - ErrorCachingMinTTL: 86400
@@ -761,12 +780,21 @@ Resources:
             QueryString: False
             Cookies:
               Forward: none
-          TargetOriginId: s3-origin
+          TargetOriginId:
+            !Join
+              - '/'
+              - - !Ref AWS::StackName
+                - 'prod'
           ViewerProtocolPolicy: redirect-to-https
         Enabled: True
         Origins:
-          - DomainName: !GetAtt BucketPROD.DomainName
-            Id: s3-origin
+          - DomainName: !GetAtt WebsiteBucket.DomainName
+            OriginPath: '/prod'
+            Id:
+              !Join
+                - '/'
+                - - !Ref AWS::StackName
+                  - 'prod'
             S3OriginConfig:
               OriginAccessIdentity:
                 !Join
@@ -774,7 +802,7 @@ Resources:
                   - - 'origin-access-identity'
                     - 'cloudfront'
                     - !Ref CloudFrontOriginAccessIdentityPROD
-        PriceClass: !Ref CloudFrontPriceClassPROD
+        PriceClass: !Ref CloudFrontPriceClass
         ViewerCertificate:
           !If
             - UseExistingCertPROD
@@ -803,7 +831,7 @@ Resources:
       DomainName: !Ref CloudFrontNamePROD
       DomainValidationOptions:
         - DomainName: !Ref CloudFrontNamePROD
-          ValidationDomain: !Ref ValidationDomain
+          ValidationDomain: !Ref ValidationDomain          
 Outputs:
   PipelineUrl:
     Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
