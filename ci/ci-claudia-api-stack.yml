@@ -5,19 +5,20 @@ Parameters:
   ApplicationName:
     Type: String
     Description: Name of application from package.json
-  LambdaExecutionRoleName:
-    Type: String
-    Description: Name of IAM role that will be created for executing the lambda functions
   GitHubUser:
     Type: String
     Description: GitHub User
   GitHubRepo:
     Type: String
     Description: GitHub Repo to pull from. Only the Name. not the URL
-  GitHubBranch:
+  GitHubBranchPROD:
     Type: String
-    Description: GitHub Branch
+    Description: GitHub Branch for PROD
     Default: 'master'
+  GitHubBranchDEV:
+    Type: String
+    Description: GitHub Branch for DEV
+    Default: 'dev'
   GitHubToken:
     NoEcho: true
     Type: String
@@ -44,14 +45,14 @@ Metadata:
           default: Resources
         Parameters:
           - ApplicationName
-          - LambdaExecutionRoleName
       - Label:
           default: GitHub Configuration
         Parameters:
           - GitHubToken
           - GitHubUser
           - GitHubRepo
-          - GitHubBranch
+          - GitHubBranchPROD
+          - GitHubBranchDEV
       - Label:
           default: Build Configuration
         Parameters:
@@ -66,16 +67,16 @@ Metadata:
     ParameterLabels:
       ApplicationName:
         default: Application Name
-      LambdaExecutionRoleName:
-        default: Lambda Execution Role Name
       GitHubToken:
         default: GitHub OAuth2 Token
       GitHubUser:
         default: GitHub User/Org Name
       GitHubRepo:
         default: GitHub Repository Name
-      GitHubBranch:
-        default: GitHub Branch Name
+      GitHubBranchPROD:
+        default: GitHub Branch Name for PROD
+      GitHubBranchDEV:
+        default: GitHub Branch Name for DEV
       BuildType: 
         default: CodeBuild type
       BuildComputeType:
@@ -98,7 +99,8 @@ Resources:
       Policies:
         - PolicyName: !Join 
             - '-'
-            - - !Ref LambdaExecutionRoleName
+            - - !Ref AWS::StackName
+              - lambdaexecution
               - policy
           PolicyDocument:
             Version: 2012-10-17
@@ -131,21 +133,34 @@ Resources:
                   - 'xray:PutTelemetryRecords'
                 Resource: '*'
       Path: /
-      RoleName: !Ref LambdaExecutionRoleName
+      RoleName:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'lambdaexecution'
+            - 'role'
   PipelineBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
+      BucketName: 
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'pipeline'
       LifecycleConfiguration:
         Rules:
           - ExpirationInDays: 1
             Status: Enabled
-  ClaudiaUpdateBucket:
-    Type: AWS::S3::Bucket
-    DeletionPolicy: Delete
   SecretsBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
+    Properties:
+      BucketName:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            -  'secrets'
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
@@ -158,6 +173,12 @@ Resources:
           Action:
           - sts:AssumeRole
       Path: /
+      RoleName:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'codebuild'
+            - 'role'
       Policies:
       - PolicyName: codebuild-service
         PolicyDocument:
@@ -178,6 +199,12 @@ Resources:
           Action:
           - sts:AssumeRole
       Path: /
+      RoleName:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'codepipeline'
+            - 'role'
       Policies:
       - PolicyName: codepipeline-service
         PolicyDocument:
@@ -187,7 +214,8 @@ Resources:
             - codebuild:BatchGetBuilds
             - codebuild:StopBuild
             Resource:
-            - !GetAtt 'CodeBuildBuildAPI.Arn'
+            - !GetAtt 'CodeBuildDEV.Arn'
+            - !GetAtt 'CodeBuildPROD.Arn'
             Effect: Allow
           - Action:
             - s3:GetObject
@@ -205,13 +233,18 @@ Resources:
                 - !Ref 'PipelineBucket'
                 - /*
             Effect: Allow
+          - Action:
+            - sns:Publish
+            Resource:
+            - !Ref DeveloperNotification
+            Effect: Allow
           Version: '2012-10-17'
-  CodeBuildBuildAPI:
+  CodeBuildDEV:
     Type: AWS::CodeBuild::Project
     DependsOn: [CodeBuildRole, LambdaExecutionRole]
     Properties:
-      Name: !Sub ${AWS::StackName}-BuildAPI
-      Description: Build API with npm and claudia
+      Name: !Sub ${AWS::StackName}-codebuild-dev
+      Description: Build dev API with npm and claudia
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -231,11 +264,9 @@ Resources:
                   - npm install --save
               pre_build:
                 commands:
-                  - echo Get existing claudia config from S3 if it exists
-                  - config_exists=$(aws s3 ls s3://${ClaudiaUpdateBucket}/claudia.json); echo ''
-                  - if [ "$config_exists" ]; then aws s3 cp s3://${ClaudiaUpdateBucket}/claudia.json .; fi
-                  - echo Get secret .env file
-                  - aws s3 sync s3://${SecretsBucket} .
+                  - echo Get secret .env file and claudia.json file
+                  - aws s3 sync s3://${SecretsBucket}/dev .
+                  - aws s3 sync s3://${SecretsBucket}/shared .
                   - echo Make script executable
                   - chmod +x bin/claudia-deploy.sh
               build:
@@ -246,14 +277,109 @@ Resources:
                 commands:
                   - echo Build completed on `date`
                   - echo Store claudia config in S3
-                  - aws s3 cp claudia.json s3://${ClaudiaUpdateBucket}/claudia.json
+                  - aws s3 cp claudia.json s3://${SecretsBucket}/shared/claudia.json
           - {
             LocalLambdaExecutionRole: !GetAtt LambdaExecutionRole.Arn
             }
       TimeoutInMinutes: 20
-  Pipeline:
+  CodeBuildPROD:
+    Type: AWS::CodeBuild::Project
+    DependsOn: [CodeBuildRole, LambdaExecutionRole]
+    Properties:
+      Name: !Sub ${AWS::StackName}-codebuild-prod
+      Description: Build prod API with npm and claudia
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: !Ref BuildType
+        ComputeType: !Ref BuildComputeType
+        Image: !Sub ${BuildImage}
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Sub 
+          - |
+            version: 0.2
+            phases:
+              install:
+                commands:
+                  - echo Install started on `date`
+                  - npm install --save
+              pre_build:
+                commands:
+                  - echo Get secret .env file and claudia.json file
+                  - aws s3 sync s3://${SecretsBucket}/prod .
+                  - aws s3 sync s3://${SecretsBucket}/shared .
+                  - echo Make script executable
+                  - chmod +x bin/claudia-deploy.sh
+              build:
+                commands:
+                  - echo Build started on `date`
+                  - if [ -r claudia.json ]; then npm run update env.json; else npm run deploy env.json ${LocalLambdaExecutionRole}; fi
+              post_build:
+                commands:
+                  - echo Build completed on `date`
+                  - echo Store claudia config in S3
+                  - aws s3 cp claudia.json s3://${SecretsBucket}/shared/claudia.json
+          - {
+            LocalLambdaExecutionRole: !GetAtt LambdaExecutionRole.Arn
+            }
+      TimeoutInMinutes: 20
+  PipelineDEV:
     Type: AWS::CodePipeline::Pipeline
     Properties:
+      Name:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'pipeline'
+            - 'dev'
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+      - Name: SourceDEV
+        Actions:
+        - InputArtifacts: []
+          Name: Source
+          ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Version: '1'
+            Provider: GitHub
+          OutputArtifacts:
+          - Name: SourceOutput
+          Configuration:
+            Owner: !Ref GitHubUser
+            Repo: !Ref GitHubRepo
+            Branch: !Ref GitHubBranchDEV
+            OAuthToken: !Ref GitHubToken
+          RunOrder: 1
+      - Name: DeployDEV
+        Actions:
+        - Name: NPM_Claudia_Deploy
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Version: '1'
+            Provider: 'CodeBuild'
+          InputArtifacts:
+          - Name: SourceOutput
+          OutputArtifacts:
+          - Name: BuildOutput
+          Configuration:
+            ProjectName: !Ref CodeBuildDEV
+          RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineBucket
+  PipelinePROD:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'pipeline'
+            - 'prod'
       RoleArn: !GetAtt CodePipelineRole.Arn
       Stages:
       - Name: Source
@@ -270,10 +396,10 @@ Resources:
           Configuration:
             Owner: !Ref GitHubUser
             Repo: !Ref GitHubRepo
-            Branch: !Ref GitHubBranch
+            Branch: !Ref GitHubBranchPROD
             OAuthToken: !Ref GitHubToken
           RunOrder: 1
-      - Name: Deploy
+      - Name: DeployDEV
         Actions:
         - Name: NPM_Claudia_Deploy
           ActionTypeId:
@@ -284,9 +410,36 @@ Resources:
           InputArtifacts:
           - Name: SourceOutput
           OutputArtifacts:
-          - Name: BuildOutput
+          - Name: BuildOutputDEV
           Configuration:
-            ProjectName: !Ref CodeBuildBuildAPI
+            ProjectName: !Ref CodeBuildDEV
+          RunOrder: 1
+      - Name: ProdApproval
+        Actions:
+        - Name: Approve
+          ActionTypeId:
+            Category: Approval
+            Owner: AWS
+            Version: 1
+            Provider: Manual
+          Configuration:
+            NotificationArn: !Ref DeveloperNotification
+            CustomData: Approve new deployment of API in production.
+          RunOrder: 1
+      - Name: DeployPROD
+        Actions:
+        - Name: NPM_Claudia_Deploy
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Version: '1'
+            Provider: 'CodeBuild'
+          InputArtifacts:
+          - Name: SourceOutput
+          OutputArtifacts:
+          - Name: BuildOutputPROD
+          Configuration:
+            ProjectName: !Ref CodeBuildPROD
           RunOrder: 1
       ArtifactStore:
         Type: S3
@@ -330,20 +483,24 @@ Resources:
           - CANCELED
           - SUPERSEDED
           pipeline:
-          - !Ref Pipeline
+          - !Ref PipelineDEV
+          - !Ref PipelinePROD
       State: ENABLED
       Targets: 
         - Arn: !Ref 'DeveloperNotification'
           Id: Pipeline_State_Notification
           InputTransformer:
-            InputTemplate: !Sub '"The Pipeline <pipeline> has <state>. Additional details can be reviewed at https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}."'
+            InputTemplate: !Sub '"The pipeline <pipeline> has <state>. Additional details can be reviewed at https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/<pipeline>."'
             InputPathsMap:
               pipeline: $.detail.pipeline
               state: $.detail.state
 Outputs:
-  PipelineUrl:
-    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
-    Description: CodePipeline URL
+  PipelineUrlDEV:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${PipelineDEV}
+    Description: DEV CodePipeline URL
+  PipelineUrlPROD:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${PipelinePROD}
+    Description: PROD CodePipeline URL    
   SecretsBucket:
     Value: !Sub s3://${SecretsBucket}
     Description: Secrets Bucket
