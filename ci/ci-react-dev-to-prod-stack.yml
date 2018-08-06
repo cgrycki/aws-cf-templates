@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Pipeline to deploy a react application to a dev environment, and after manual approval, to a prod environment.
+Description: This stack creates two pipelines to deploy a react application to a dev environment, and after manual approval, to a prod environment.
 Parameters:
   CloudFrontNamePROD:
     Type: String
@@ -41,7 +41,11 @@ Parameters:
   GitHubRepo:
     Type: String
     Description: GitHub Repo to pull from. Only the Name. not the URL
-  GitHubBranch:
+  GitHubBranchDEV:
+    Type: String
+    Description: GitHub Branch
+    Default: 'dev'
+  GitHubBranchPROD:
     Type: String
     Description: GitHub Branch
     Default: 'master'
@@ -61,10 +65,6 @@ Parameters:
     Type: String
     Default: 'aws/codebuild/nodejs:6.3.1'
     Description: The build image to use for building the app
-  DeployImage:
-    Type: String
-    Default: 'aws/codebuild/ubuntu-base:14.04'
-    Description: The build image to use for deploying the app
   EmailAddress:
     Type: String
     Description: E-Mail address that will receive pipeline state notifications and dev to prod approval requests.
@@ -94,14 +94,14 @@ Metadata:
           - GitHubToken
           - GitHubUser
           - GitHubRepo
-          - GitHubBranch
+          - GitHubBranchDEV
+          - GitHubBranchPROD
       - Label:
           default: Build Configuration
         Parameters:
           - BuildType
           - BuildComputeType
           - BuildImage
-          - DeployImage
       - Label:
           default: Notifications
         Parameters:
@@ -127,16 +127,16 @@ Metadata:
         default: GitHub User/Org Name
       GitHubRepo: 
         default: GitHub Repository Name
-      GitHubBranch: 
-        default: GitHub Branch Name
+      GitHubBranchDEV: 
+        default: GitHub Branch Name for Dev
+      GitHubBranchPROD:
+        default: GitHub Branch Name for Prod
       BuildType: 
         default: CodeBuild type
       BuildComputeType: 
         default: CodeBuild instance type
       BuildImage: 
         default: Build image
-      DeployImage: 
-        default: Deploy image
       EmailAddress:
         default: E-Mail Address
 Resources:
@@ -181,10 +181,8 @@ Resources:
             - codebuild:BatchGetBuilds
             - codebuild:StopBuild
             Resource:
-            - !GetAtt 'CodeBuildBuildDEV.Arn'
-            - !GetAtt 'CodeBuildBuildPROD.Arn'
-            - !GetAtt 'CodeBuildDeployDEV.Arn'
-            - !GetAtt 'CodeBuildDeployPROD.Arn'
+            - !GetAtt 'CodeBuildPROD.Arn'
+            - !GetAtt 'CodeBuildDEV.Arn'
             Effect: Allow
           - Action:
             - s3:GetObject
@@ -212,7 +210,11 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
-      BucketName: !Ref AWS::StackName
+      BucketName:
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'website'
   SecretsBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -235,12 +237,12 @@ Resources:
           - '-'
           - - !Ref AWS::StackName
             - 'pipeline'
-  CodeBuildBuildDEV:
+  CodeBuildDEV:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
     Properties:
-      Name: !Sub ${AWS::StackName}-Build-Dev
-      Description: Build site with npm
+      Name: !Sub ${AWS::StackName}-codebuild-dev
+      Description: Build and deploy dev
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -248,10 +250,13 @@ Resources:
         Type: !Ref BuildType
         ComputeType: !Ref BuildComputeType
         Image: !Sub ${BuildImage}
+        EnvironmentVariables:
+          - Name: CloudFrontDistributionId
+            Value: !Ref CloudFrontDistributionDEV
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
-          version: 0.2
+          version: 0.1
           phases:
             install:
               commands:
@@ -264,20 +269,23 @@ Resources:
               commands:
                 - echo Build started on `date`
                 - npm run build
+                - echo Deploying site to S3
+                - aws s3 sync . s3://${AWS::StackName}/dev --delete --acl public-read
+                - echo Invalidating all files in cloudfront cache
+                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
             post_build:
               commands:
-                - echo Build completed on `date`
+                - echo Build completed on `date`                
           artifacts:
             files:
               - '**/*'
-            base-directory: build
-      TimeoutInMinutes: 15
-  CodeBuildBuildPROD:
+      TimeoutInMinutes: 30            
+  CodeBuildPROD:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
     Properties:
-      Name: !Sub ${AWS::StackName}-Build-Prod
-      Description: Build site with npm
+      Name: !Sub ${AWS::StackName}-codebuild-prod
+      Description: Build and deploy prod
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE
@@ -301,74 +309,18 @@ Resources:
               commands:
                 - echo Build started on `date`
                 - npm run build
+                - echo Deploying site to S3
+                - aws s3 sync ./build s3://${AWS::StackName}/prod --delete --acl public-read
+                - echo Invalidating all files in cloudfront cache
+                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
             post_build:
               commands:
                 - echo Build completed on `date`
           artifacts:
             files:
               - '**/*'
-            base-directory: build
-      TimeoutInMinutes: 15
-  CodeBuildDeployDEV:
-    Type: AWS::CodeBuild::Project
-    DependsOn: CodeBuildRole
-    Properties:
-      Name: !Sub ${AWS::StackName}-DeployDEV
-      Description: Deploy site to S3 and CloudFront
-      ServiceRole: !GetAtt CodeBuildRole.Arn
-      Artifacts:
-        Type: CODEPIPELINE
-      Environment:
-        Type: !Ref BuildType
-        ComputeType: !Ref BuildComputeType
-        Image: !Sub ${DeployImage}
-        EnvironmentVariables:
-          - Name: CloudFrontDistributionId
-            Value: !Ref CloudFrontDistributionDEV
-      Source:
-        Type: CODEPIPELINE
-        BuildSpec: !Sub |
-          version: 0.1
-          phases:
-            build:
-              commands:
-                - echo Deploying site to S3
-                - aws s3 sync . s3://${AWS::StackName}/dev --delete --acl public-read
-                - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
-          artifacts:
-            files:
-              - '**/*'
-      TimeoutInMinutes: 10
-  CodeBuildDeployPROD:
-    Type: AWS::CodeBuild::Project
-    DependsOn: CodeBuildRole
-    Properties:
-      Name: !Sub ${AWS::StackName}-DeployPROD
-      Description: Deploy site to S3 and CloudFront
-      ServiceRole: !GetAtt CodeBuildRole.Arn
-      Artifacts:
-        Type: CODEPIPELINE
-      Environment:
-        Type: !Ref BuildType
-        ComputeType: !Ref BuildComputeType
-        Image: !Sub ${DeployImage}
-        EnvironmentVariables:
-          - Name: CloudFrontDistributionId
-            Value: !Ref CloudFrontDistributionPROD
-      Source:
-        Type: CODEPIPELINE
-        BuildSpec: !Sub |
-          version: 0.1
-          phases:
-            build:
-              commands:
-                - echo Deploying site to S3
-                - aws s3 sync . s3://${AWS::StackName}/prod --delete --acl public-read
-                - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
-      TimeoutInMinutes: 10
-  Pipeline:
+      TimeoutInMinutes: 30
+  PipelineDEV:
     Type: AWS::CodePipeline::Pipeline
     Properties:
       Name: 
@@ -376,6 +328,7 @@ Resources:
           - '-'
           - - !Ref AWS::StackName
             - 'pipeline'
+            - 'dev'
       RoleArn: !GetAtt CodePipelineRole.Arn
       Stages:
       - Name: Source
@@ -392,10 +345,10 @@ Resources:
           Configuration:
             Owner: !Ref GitHubUser
             Repo: !Ref GitHubRepo
-            Branch: !Ref GitHubBranch
+            Branch: !Ref GitHubBranchDEV
             OAuthToken: !Ref GitHubToken
           RunOrder: 1
-      - Name: Build_Dev
+      - Name: Build_Deploy_Dev
         Actions:
         - Name: NPM_Build
           ActionTypeId:
@@ -408,22 +361,53 @@ Resources:
           OutputArtifacts:
           - Name: BuildDevOutput
           Configuration:
-            ProjectName: !Ref CodeBuildBuildDEV
+            ProjectName: !Ref CodeBuildDEV
           RunOrder: 1
-      - Name: Deploy_Dev
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineBucket
+  PipelinePROD:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: 
+        !Join
+          - '-'
+          - - !Ref AWS::StackName
+            - 'pipeline'
+            - 'prod'
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+      - Name: Source
         Actions:
-        - Name: Deploy
+        - InputArtifacts: []
+          Name: Source
+          ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Version: '1'
+            Provider: GitHub
+          OutputArtifacts:
+          - Name: SourceOutput
+          Configuration:
+            Owner: !Ref GitHubUser
+            Repo: !Ref GitHubRepo
+            Branch: !Ref GitHubBranchPROD
+            OAuthToken: !Ref GitHubToken
+          RunOrder: 1
+      - Name: Build_Deploy_Dev
+        Actions:
+        - Name: NPM_Build
           ActionTypeId:
             Category: Build
             Owner: AWS
             Version: '1'
-            Provider: CodeBuild
+            Provider: 'CodeBuild'
           InputArtifacts:
-          - Name: BuildDevOutput
+          - Name: SourceOutput
           OutputArtifacts:
-          - Name: DevOutput
+          - Name: BuildDevOutput
           Configuration:
-            ProjectName: !Ref CodeBuildDeployDEV
+            ProjectName: !Ref CodeBuildDEV
           RunOrder: 1
       - Name: ProdApproval
         Actions:
@@ -437,7 +421,7 @@ Resources:
             NotificationArn: !Ref DeveloperNotification
             CustomData: Approve new deployment of site in production.
           RunOrder: 1
-      - Name: Build_Prod
+      - Name: Build_Deploy_PROD
         Actions:
         - Name: NPM_Build
           ActionTypeId:
@@ -450,22 +434,7 @@ Resources:
           OutputArtifacts:
           - Name: BuildProdOutput
           Configuration:
-            ProjectName: !Ref CodeBuildBuildPROD
-          RunOrder: 1
-      - Name: Deploy_Prod
-        Actions:
-        - Name: Deploy
-          ActionTypeId:
-            Category: Build
-            Owner: AWS
-            Version: '1'
-            Provider: CodeBuild
-          InputArtifacts:
-          - Name: BuildProdOutput
-          OutputArtifacts:
-          - Name: ProdOutput
-          Configuration:
-            ProjectName: !Ref CodeBuildDeployPROD
+            ProjectName: !Ref CodeBuildPROD
           RunOrder: 1
       ArtifactStore:
         Type: S3
@@ -521,13 +490,14 @@ Resources:
           - CANCELED
           - SUPERSEDED
           pipeline:
-          - !Ref Pipeline
+          - !Ref PipelineDEV
+          - !Ref PipelinePROD
       State: ENABLED
       Targets: 
         - Arn: !Ref 'DeveloperNotification'
           Id: Pipeline_State_Notification
           InputTransformer:
-            InputTemplate: !Sub '"The Pipeline <pipeline> has <state>. Additional details can be reviewed at https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}."'
+            InputTemplate: !Sub '"The pipeline <pipeline> has <state>. Additional details can be reviewed at https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/<pipeline>."'
             InputPathsMap:
               pipeline: $.detail.pipeline
               state: $.detail.state
@@ -550,7 +520,7 @@ Resources:
           build-status:
             - SUCCEEDED
           project-name:
-          - !Ref CodeBuildDeployDEV
+          - !Ref CodeBuildDEV
       State: ENABLED
       Targets:
         - Arn: !Ref 'DeveloperNotification'
@@ -596,7 +566,7 @@ Resources:
           build-status:
             - SUCCEEDED
           project-name:
-          - !Ref CodeBuildDeployPROD
+          - !Ref CodeBuildPROD
       State: ENABLED
       Targets:
         - Arn: !Ref 'DeveloperNotification'
@@ -833,8 +803,11 @@ Resources:
         - DomainName: !Ref CloudFrontNamePROD
           ValidationDomain: !Ref ValidationDomain          
 Outputs:
-  PipelineUrl:
-    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${Pipeline}
+  PipelineUrlDEV:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${PipelineDEV}
+    Description: CodePipeline URL
+  PipelineUrlPROD:
+    Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${PipelinePROD}
     Description: CodePipeline URL
   UrlDEV:
     Value: 
