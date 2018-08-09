@@ -261,7 +261,7 @@ Resources:
             install:
               commands:
                 - echo Install started on `date`
-                - npm install --save
+                - npm install --save --save-exact
             pre_build:
               commands:
                 - aws s3 sync s3://${SecretsBucket}/dev .
@@ -293,6 +293,9 @@ Resources:
         Type: !Ref BuildType
         ComputeType: !Ref BuildComputeType
         Image: !Sub ${BuildImage}
+        EnvironmentVariables:
+          - Name: CloudFrontDistributionId
+            Value: !Ref CloudFrontDistributionPROD
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -301,7 +304,7 @@ Resources:
             install:
               commands:
                 - echo Install started on `date`
-                - npm install --save
+                - npm install --save --save-exact
             pre_build:
               commands:
                 - aws s3 sync s3://${SecretsBucket}/prod .
