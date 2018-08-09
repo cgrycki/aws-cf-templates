@@ -316,6 +316,7 @@ Resources:
                 commands:
                   - echo Build started on `date`
                   - if [ -r claudia.json ]; then npm run update env.json; else npm run deploy env.json ${LocalLambdaExecutionRole}; fi
+                  - npm run set-prod
               post_build:
                 commands:
                   - echo Build completed on `date`
