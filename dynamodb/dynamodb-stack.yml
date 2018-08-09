@@ -1,6 +1,6 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
-Description: A simple stack to create four DynamoDB tables
+Description: A simple stack to create three sets of four DynamoDB tables. Table names will be appended with '-test', '-dev', and '-prod'.
 Parameters:
   TableName1:
     Type: String
@@ -54,14 +54,52 @@ Parameters:
       - 'S'
       - 'N'
       - 'B'
-  ReadCapacityUnits:
+  ReadCapacityUnitsInitial:
     Type: Number
-    Description: Read capacity units
+    Description: Initially provisioned read capacity units
+    MinValue: 1
     Default: 5
-  WriteCapacityUnits:
+  WriteCapacityUnitsInitial:
     Type: Number
-    Description: Write capacity units
+    Description: Initially provisioned write capacity units
+    MinValue: 1
     Default: 5
+  ReadCapacityUnitsMin:
+    Type: Number
+    Description: Minimum read capacity units
+    MinValue: 1
+    Default: 1
+  WriteCapacityUnitsMin:
+    Type: Number
+    Description: Minimum write capacity units
+    MinValue: 1
+    Default: 1
+  ReadCapacityUnitsMax:
+    Type: Number
+    Description: Maximum read capacity units
+    MinValue: 1
+    Default: 10
+  WriteCapacityUnitsMax:
+    Type: Number
+    Description: Maximum write capacity units
+    MinValue: 1
+    Default: 10
+  TargetValue:
+    Type: Number
+    Description: Scale accordingly to utilize capacity at this percentage
+    Default: 50
+    MinValue: 1
+    MaxValue: 100
+  ScaleInCooldown:
+    Type: Number
+    Description: Seconds to wait in between scale in operations
+    Default: 60
+    MinValue: 0
+  ScaleOutCooldown:
+    Type: Number
+    Description: Seconds to wait in between scale out operations
+    Default: 60
+    MinValue: 0
   ServerSideEncryption:
     Type: String
     Description: Server-side Encryption
@@ -94,20 +132,50 @@ Metadata:
           - KeyAttributeName4
           - KeyAttributeType4
       - Label:
-          default: Performance
+          default: Performance and Autoscaling
         Parameters:
-          - ReadCapacityUnits
-          - WriteCapacityUnits
+          - ReadCapacityUnitsInitial
+          - WriteCapacityUnitsInitial
+          - ReadCapacityUnitsMin
+          - WriteCapacityUnitsMin
+          - ReadCapacityUnitsMax
+          - WriteCapacityUnitsMax
+          - TargetValue
+          - ScaleInCooldown
+          - ScaleOutCooldown
+      - Label:
+          default: Security
+        Parameters:
+          - ServerSideEncryption
+          - IAMGroups
     ParameterLabels:
       KeyAttributeName:
         default: Key Name
       KeyAttributeType:
         default: Key Data Type
+      ReadCapacityUnitsInitial:
+        default: Initial Read Capacity Units
+      WriteCapacityUnitsInitial:
+        default: Initial Write Capacity Units
+      ReadCapacityUnitsMin:
+        default: Minimum Read Capacity Units
+      WriteCapacityUnitsMin:
+        default: Minimum Write Capacity Units
+      ReadCapacityUnitsMax:
+        default: Maximum Read Capacity Units
+      WriteCapacityUnitsMax:
+        default: Maximum Write Capacity Units
+      TargetValue:
+        default: Autoscale Target Value
+      ScaleInCooldown:
+        default: Scale In Cooldown
+      ScaleOutCooldown:
+        default: Scale Out Cooldown
 Resources:
-  DynamoDBTable1:
+  DynamoDBTable1TEST:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Ref TableName1
+      TableName: !Sub "${TableName1}-test"
       AttributeDefinitions:
         - AttributeName: !Ref KeyAttributeName1
           AttributeType: !Ref KeyAttributeType1
@@ -115,14 +183,14 @@ Resources:
         - AttributeName: !Ref KeyAttributeName1
           KeyType: 'HASH'
       ProvisionedThroughput:
-        ReadCapacityUnits: !Ref ReadCapacityUnits
-        WriteCapacityUnits: !Ref WriteCapacityUnits
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
-  DynamoDBTable2:
+  DynamoDBTable2TEST:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Ref TableName2
+      TableName: !Sub "${TableName2}-test"
       AttributeDefinitions:
         - AttributeName: !Ref KeyAttributeName2
           AttributeType: !Ref KeyAttributeType2
@@ -130,14 +198,14 @@ Resources:
         - AttributeName: !Ref KeyAttributeName2
           KeyType: 'HASH'
       ProvisionedThroughput:
-        ReadCapacityUnits: !Ref ReadCapacityUnits
-        WriteCapacityUnits: !Ref WriteCapacityUnits
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
-  DynamoDBTable3:
+  DynamoDBTable3TEST:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Ref TableName3
+      TableName: !Sub "${TableName3}-test"
       AttributeDefinitions:
         - AttributeName: !Ref KeyAttributeName3
           AttributeType: !Ref KeyAttributeType3
@@ -145,14 +213,14 @@ Resources:
         - AttributeName: !Ref KeyAttributeName3
           KeyType: 'HASH'
       ProvisionedThroughput:
-        ReadCapacityUnits: !Ref ReadCapacityUnits
-        WriteCapacityUnits: !Ref WriteCapacityUnits
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
-  DynamoDBTable4:
+  DynamoDBTable4TEST:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: !Ref TableName4
+      TableName: !Sub "${TableName4}-test"
       AttributeDefinitions:
         - AttributeName: !Ref KeyAttributeName4
           AttributeType: !Ref KeyAttributeType4
@@ -160,15 +228,711 @@ Resources:
         - AttributeName: !Ref KeyAttributeName4
           KeyType: 'HASH'
       ProvisionedThroughput:
-        ReadCapacityUnits: !Ref ReadCapacityUnits
-        WriteCapacityUnits: !Ref WriteCapacityUnits
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable1DEV:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName1}-dev"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName1
+          AttributeType: !Ref KeyAttributeType1
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName1
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable2DEV:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName2}-dev"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName2
+          AttributeType: !Ref KeyAttributeType2
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName2
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable3DEV:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName3}-dev"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName3
+          AttributeType: !Ref KeyAttributeType3
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName3
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable4DEV:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName4}-dev"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName4
+          AttributeType: !Ref KeyAttributeType4
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName4
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable1PROD:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName1}-prod"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName1
+          AttributeType: !Ref KeyAttributeType1
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName1
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable2PROD:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName2}-prod"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName2
+          AttributeType: !Ref KeyAttributeType2
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName2
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable3PROD:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName3}-prod"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName3
+          AttributeType: !Ref KeyAttributeType3
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName3
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  DynamoDBTable4PROD:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${TableName4}-prod"
+      AttributeDefinitions:
+        - AttributeName: !Ref KeyAttributeName4
+          AttributeType: !Ref KeyAttributeType4
+      KeySchema:
+        - AttributeName: !Ref KeyAttributeName4
+          KeyType: 'HASH'
+      ProvisionedThroughput:
+        ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
+        WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      SSESpecification: 
+        SSEEnabled: !Ref ServerSideEncryption
+  ReadCapacityScalableTargetTable1TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable1TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable2TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable2TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable3TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable3TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable4TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable4TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable1DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable1DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable2DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable2DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable3DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable3DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable4DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable4DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable1PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable1PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable2PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable2PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable3PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable3PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadCapacityScalableTargetTable4PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref ReadCapacityUnitsMax
+      MinCapacity: !Ref ReadCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable4PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:ReadCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable1TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable1TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable2TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable2TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable3TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable3TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable4TEST:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable4TEST
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable1DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable1DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable2DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable2DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable3DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable3DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable4DEV:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable4DEV
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable1PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable1PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable2PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable2PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable3PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable3PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  WriteCapacityScalableTargetTable4PROD:
+    Type: "AWS::ApplicationAutoScaling::ScalableTarget"
+    Properties:
+      MaxCapacity: !Ref WriteCapacityUnitsMax
+      MinCapacity: !Ref WriteCapacityUnitsMin
+      ResourceId: !Join
+        - /
+        - - table
+          - !Ref DynamoDBTable4PROD
+      RoleARN: !GetAtt ScalingRole.Arn
+      ScalableDimension: "dynamodb:table:WriteCapacityUnits"
+      ServiceNamespace: dynamodb
+  ReadScalingPolicyTable1TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName1}-test-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable1TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable2TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName2}-test-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable2TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable3TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName3}-test-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable3TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable4TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName4}-test-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable4TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable1DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName1}-dev-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable1DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable2DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName2}-dev-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable2DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable3DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName3}-dev-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable3DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable4DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName4}-dev-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable4DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable1PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName1}-prod-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable1PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable2PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName2}-prod-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable2PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable3PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName3}-prod-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable3PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  ReadScalingPolicyTable4PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName4}-prod-read-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ReadCapacityScalableTargetTable4PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBReadCapacityUtilization
+  WriteScalingPolicyTable1TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName1}-test-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable1TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable2TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName2}-test-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable2TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable3TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName3}-test-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable3TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable4TEST:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName4}-test-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable4TEST
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable1DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName1}-dev-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable1DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable2DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName2}-dev-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable2DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable3DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName3}-dev-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable3DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable4DEV:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName4}-dev-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable4DEV
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable1PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName1}-prod-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable1PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable2PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName2}-prod-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable2PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable3PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName3}-prod-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable3PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+  WriteScalingPolicyTable4PROD:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties: 
+      Policyname: !Sub ${AWS::StackName}-${TableName4}-prod-write-autoscale-policy
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WriteCapacityScalableTargetTable4PROD
+      TargetTrackingScalingPolicyConfiguration: 
+        TargetValue: !Ref TargetValue
+        ScaleInCooldown: !Ref ScaleInCooldown
+        ScaleOutCooldown: !Ref ScaleOutCooldown
+        PredefinedMetricSpecification:
+        PredefinedMetricType: DynamoDBWriteCapacityUtilization
   IAMPolicyReadWrite:
     Type: AWS::IAM::Policy
     Properties:
       Groups: !Ref IAMGroups
-      PolicyName: dynamodb-tables-rw
+      PolicyName: !Sub ${AWS::StackName}-rw-policy
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -185,39 +949,175 @@ Resources:
               - 'dynamodb:UpdateItem'
             Resource:
               - !GetAtt
-                - DynamoDBTable1
+                - DynamoDBTable1TEST
                 - Arn
               - !GetAtt
-                - DynamoDBTable2
+                - DynamoDBTable2TEST
                 - Arn
               - !GetAtt
-                - DynamoDBTable3
+                - DynamoDBTable3TEST
                 - Arn
               - !GetAtt
-                - DynamoDBTable4
+                - DynamoDBTable4TEST
                 - Arn
+              - !GetAtt
+                - DynamoDBTable1DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable2DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable3DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable4DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable1PROD
+                - Arn
+              - !GetAtt
+                - DynamoDBTable2PROD
+                - Arn
+              - !GetAtt
+                - DynamoDBTable3PROD
+                - Arn
+              - !GetAtt
+                - DynamoDBTable4PROD
+                - Arn                
+  ScalingRole: 
+    Type: "AWS::IAM::Role"
+    Properties: 
+    AssumeRolePolicyDocument: 
+      Version: "2012-10-17"
+      Statement: 
+      - Effect: Allow
+        Principal: 
+        Service: 
+          - "application-autoscaling.amazonaws.com"
+        Action: 
+        - "sts:AssumeRole"
+    Path: "/"
+    Policies: 
+      - PolicyName: !Sub {$AWS::StackName}-autoscale-policy
+        PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+        - Effect: Allow
+          Action:          
+          - "dynamodb:DescribeTable"
+          - "dynamodb:UpdateTable"
+          - "cloudwatch:PutMetricAlarm"
+          - "cloudwatch:DescribeAlarms"
+          - "cloudwatch:GetMetricStatistics"
+          - "cloudwatch:SetAlarmState"
+          - "cloudwatch:DeleteAlarms"
+          Resource:
+              - !GetAtt
+                - DynamoDBTable1TEST
+                - Arn
+              - !GetAtt
+                - DynamoDBTable2TEST
+                - Arn
+              - !GetAtt
+                - DynamoDBTable3TEST
+                - Arn
+              - !GetAtt
+                - DynamoDBTable4TEST
+                - Arn
+              - !GetAtt
+                - DynamoDBTable1DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable2DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable3DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable4DEV
+                - Arn
+              - !GetAtt
+                - DynamoDBTable1PROD
+                - Arn
+              - !GetAtt
+                - DynamoDBTable2PROD
+                - Arn
+              - !GetAtt
+                - DynamoDBTable3PROD
+                - Arn
+              - !GetAtt
+                - DynamoDBTable4PROD
+                - Arn     
 Outputs:
-  Table1:
+  Table1TEST:
     Value: 
       !GetAtt 
-        - DynamoDBTable1
+        - DynamoDBTable1TEST
         - Arn
-    Description: DynamoDBTable1 ARN
-  Table2:
+    Description: DynamoDBTable1TEST ARN
+  Table2TEST:
     Value: 
       !GetAtt 
-        - DynamoDBTable2
+        - DynamoDBTable2TEST
         - Arn
-    Description: DynamoDBTable2 ARN
-  Table3:
+    Description: DynamoDBTable2TEST ARN
+  Table3TEST:
     Value: 
       !GetAtt 
-        - DynamoDBTable3
+        - DynamoDBTable3TEST
         - Arn
-    Description: DynamoDBTable3 ARN
-  Table4:
+    Description: DynamoDBTable3TEST ARN
+  Table4TEST:
     Value: 
       !GetAtt 
-        - DynamoDBTable4
+        - DynamoDBTable4TEST
         - 'Arn'
-    Description: DynamoDBTable4 ARN
+    Description: DynamoDBTable4TEST ARN
+  Table1DEV:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable1DEV
+        - Arn
+    Description: DynamoDBTable1DEV ARN
+  Table2DEV:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable2DEV
+        - Arn
+    Description: DynamoDBTable2DEV ARN
+  Table3DEV:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable3DEV
+        - Arn
+    Description: DynamoDBTable3DEV ARN
+  Table4DEV:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable4DEV
+        - 'Arn'
+    Description: DynamoDBTable4DEV ARN
+  Table1PROD:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable1PROD
+        - Arn
+    Description: DynamoDBTable1PROD ARN
+  Table2PROD:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable2PROD
+        - Arn
+    Description: DynamoDBTable2PROD ARN
+  Table3PROD:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable3PROD
+        - Arn
+    Description: DynamoDBTable3PROD ARN
+  Table4PROD:
+    Value: 
+      !GetAtt 
+        - DynamoDBTable4PROD
+        - 'Arn'
+    Description: DynamoDBTable4PROD ARN
