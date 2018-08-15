@@ -234,6 +234,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable1DEV:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable1TEST
     Properties:
       TableName: !Sub "${TableName1}-dev"
       AttributeDefinitions:
@@ -249,6 +250,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable2DEV:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable2TEST
     Properties:
       TableName: !Sub "${TableName2}-dev"
       AttributeDefinitions:
@@ -264,6 +266,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable3DEV:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable3TEST
     Properties:
       TableName: !Sub "${TableName3}-dev"
       AttributeDefinitions:
@@ -279,6 +282,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable4DEV:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable4TEST
     Properties:
       TableName: !Sub "${TableName4}-dev"
       AttributeDefinitions:
@@ -294,6 +298,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable1PROD:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable1DEV
     Properties:
       TableName: !Sub "${TableName1}-prod"
       AttributeDefinitions:
@@ -309,6 +314,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable2PROD:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable2DEV
     Properties:
       TableName: !Sub "${TableName2}-prod"
       AttributeDefinitions:
@@ -324,6 +330,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable3PROD:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable3DEV
     Properties:
       TableName: !Sub "${TableName3}-prod"
       AttributeDefinitions:
@@ -339,6 +346,7 @@ Resources:
         SSEEnabled: !Ref ServerSideEncryption
   DynamoDBTable4PROD:
     Type: AWS::DynamoDB::Table
+    DependsOn: DynamoDBTable4DEV
     Properties:
       TableName: !Sub "${TableName4}-prod"
       AttributeDefinitions:
@@ -643,7 +651,7 @@ Resources:
   ReadScalingPolicyTable1TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName1}-test-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName1}-test-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable1TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -651,11 +659,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable2TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName2}-test-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName2}-test-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable2TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -663,11 +671,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable3TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName3}-test-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName3}-test-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable3TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -675,11 +683,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable4TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName4}-test-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName4}-test-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable4TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -687,11 +695,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable1DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName1}-dev-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName1}-dev-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable1DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -699,11 +707,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable2DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName2}-dev-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName2}-dev-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable2DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -711,11 +719,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable3DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName3}-dev-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName3}-dev-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable3DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -723,11 +731,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable4DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName4}-dev-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName4}-dev-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable4DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -735,11 +743,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable1PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName1}-prod-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName1}-prod-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable1PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -747,11 +755,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable2PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName2}-prod-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName2}-prod-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable2PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -759,11 +767,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable3PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName3}-prod-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName3}-prod-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable3PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -771,11 +779,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   ReadScalingPolicyTable4PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName4}-prod-read-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName4}-prod-read-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref ReadCapacityScalableTargetTable4PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -783,11 +791,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBReadCapacityUtilization
+          PredefinedMetricType: DynamoDBReadCapacityUtilization
   WriteScalingPolicyTable1TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName1}-test-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName1}-test-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable1TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -795,11 +803,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable2TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName2}-test-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName2}-test-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable2TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -807,11 +815,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable3TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName3}-test-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName3}-test-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable3TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -819,11 +827,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable4TEST:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName4}-test-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName4}-test-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable4TEST
       TargetTrackingScalingPolicyConfiguration: 
@@ -831,11 +839,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable1DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName1}-dev-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName1}-dev-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable1DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -843,11 +851,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable2DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName2}-dev-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName2}-dev-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable2DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -855,11 +863,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable3DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName3}-dev-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName3}-dev-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable3DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -867,11 +875,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable4DEV:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName4}-dev-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName4}-dev-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable4DEV
       TargetTrackingScalingPolicyConfiguration: 
@@ -879,11 +887,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable1PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName1}-prod-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName1}-prod-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable1PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -891,11 +899,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable2PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName2}-prod-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName2}-prod-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable2PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -903,11 +911,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable3PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName3}-prod-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName3}-prod-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable3PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -915,11 +923,11 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   WriteScalingPolicyTable4PROD:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties: 
-      Policyname: !Sub ${AWS::StackName}-${TableName4}-prod-write-autoscale-policy
+      PolicyName: !Sub ${AWS::StackName}-${TableName4}-prod-write-autoscale-policy
       PolicyType: TargetTrackingScaling
       ScalingTargetId: !Ref WriteCapacityScalableTargetTable4PROD
       TargetTrackingScalingPolicyConfiguration: 
@@ -927,7 +935,7 @@ Resources:
         ScaleInCooldown: !Ref ScaleInCooldown
         ScaleOutCooldown: !Ref ScaleOutCooldown
         PredefinedMetricSpecification:
-        PredefinedMetricType: DynamoDBWriteCapacityUtilization
+          PredefinedMetricType: DynamoDBWriteCapacityUtilization
   IAMPolicyReadWrite:
     Type: AWS::IAM::Policy
     Properties:
@@ -987,67 +995,67 @@ Resources:
   ScalingRole: 
     Type: "AWS::IAM::Role"
     Properties: 
-    AssumeRolePolicyDocument: 
-      Version: "2012-10-17"
-      Statement: 
-      - Effect: Allow
-        Principal: 
-        Service: 
-          - "application-autoscaling.amazonaws.com"
-        Action: 
-        - "sts:AssumeRole"
-    Path: "/"
-    Policies: 
-      - PolicyName: !Sub {$AWS::StackName}-autoscale-policy
-        PolicyDocument: 
+      AssumeRolePolicyDocument: 
         Version: "2012-10-17"
         Statement: 
         - Effect: Allow
-          Action:          
-          - "dynamodb:DescribeTable"
-          - "dynamodb:UpdateTable"
-          - "cloudwatch:PutMetricAlarm"
-          - "cloudwatch:DescribeAlarms"
-          - "cloudwatch:GetMetricStatistics"
-          - "cloudwatch:SetAlarmState"
-          - "cloudwatch:DeleteAlarms"
-          Resource:
-              - !GetAtt
-                - DynamoDBTable1TEST
-                - Arn
-              - !GetAtt
-                - DynamoDBTable2TEST
-                - Arn
-              - !GetAtt
-                - DynamoDBTable3TEST
-                - Arn
-              - !GetAtt
-                - DynamoDBTable4TEST
-                - Arn
-              - !GetAtt
-                - DynamoDBTable1DEV
-                - Arn
-              - !GetAtt
-                - DynamoDBTable2DEV
-                - Arn
-              - !GetAtt
-                - DynamoDBTable3DEV
-                - Arn
-              - !GetAtt
-                - DynamoDBTable4DEV
-                - Arn
-              - !GetAtt
-                - DynamoDBTable1PROD
-                - Arn
-              - !GetAtt
-                - DynamoDBTable2PROD
-                - Arn
-              - !GetAtt
-                - DynamoDBTable3PROD
-                - Arn
-              - !GetAtt
-                - DynamoDBTable4PROD
-                - Arn     
+          Principal: 
+            Service: 
+              - "application-autoscaling.amazonaws.com"
+          Action: 
+            - "sts:AssumeRole"
+      Path: "/"
+      Policies: 
+        - PolicyName: !Sub ${AWS::StackName}-autoscale-policy
+          PolicyDocument: 
+            Version: "2012-10-17"
+            Statement: 
+            - Effect: Allow
+              Action:          
+              - "dynamodb:DescribeTable"
+              - "dynamodb:UpdateTable"
+              - "cloudwatch:PutMetricAlarm"
+              - "cloudwatch:DescribeAlarms"
+              - "cloudwatch:GetMetricStatistics"
+              - "cloudwatch:SetAlarmState"
+              - "cloudwatch:DeleteAlarms"
+              Resource:
+                  - !GetAtt
+                    - DynamoDBTable1TEST
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable2TEST
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable3TEST
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable4TEST
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable1DEV
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable2DEV
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable3DEV
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable4DEV
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable1PROD
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable2PROD
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable3PROD
+                    - Arn
+                  - !GetAtt
+                    - DynamoDBTable4PROD
+                    - Arn     
 Outputs:
   Table1TEST:
     Value: 
