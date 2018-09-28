@@ -267,12 +267,17 @@ Resources:
                   - echo Get secret .env file and claudia.json file
                   - aws s3 sync s3://${SecretsBucket}/dev .
                   - aws s3 sync s3://${SecretsBucket}/shared .
+                  - mv hawkids.js config/hawkids.js
+                  - mv client-cert.pem config/client-cert.pem
+                  - mv server-cert.pem config/server-cert.pem
+                  - mv server-key.pem config/server-key.pem
                   - echo Make script executable
                   - chmod +x bin/claudia-deploy.sh
               build:
                 commands:
                   - echo Build started on `date`
                   - if [ -r claudia.json ]; then npm run update env.json; else npm run deploy env.json ${LocalLambdaExecutionRole}; fi
+                  - npm run set-dev
               post_build:
                 commands:
                   - echo Build completed on `date`
@@ -310,6 +315,10 @@ Resources:
                   - echo Get secret .env file and claudia.json file
                   - aws s3 sync s3://${SecretsBucket}/prod .
                   - aws s3 sync s3://${SecretsBucket}/shared .
+                  - mv hawkids.js config/hawkids.js
+                  - mv client-cert.pem config/client-cert.pem
+                  - mv server-cert.pem config/server-cert.pem
+                  - mv server-key.pem config/server-key.pem
                   - echo Make script executable
                   - chmod +x bin/claudia-deploy.sh
               build:
