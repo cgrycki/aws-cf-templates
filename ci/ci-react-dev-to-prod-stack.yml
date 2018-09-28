@@ -315,6 +315,7 @@ Resources:
                 - npm run build
                 - echo Deploying site to S3
                 - aws s3 sync ./build s3://${AWS::StackName}-website/prod --delete --acl public-read
+                - aws s3 put ./build/index.html s3://${AWS::StackName}-website/prod/index.html --cache-control no-cache --acl public-read
                 - echo Invalidating all files in cloudfront cache
                 - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
             post_build:
