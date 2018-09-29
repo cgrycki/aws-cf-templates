@@ -275,7 +275,6 @@ Resources:
                 - aws s3 cp ./build/asset-manifest.json s3://${AWS::StackName}-website/dev/asset-manifest.json --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
                 - aws s3 cp ./build/service-worker.js s3://${AWS::StackName}-website/dev/service-worker.js --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
             post_build:
               commands:
                 - echo Build completed on `date`                
@@ -321,7 +320,6 @@ Resources:
                 - aws s3 cp ./build/asset-manifest.json s3://${AWS::StackName}-website/dev/asset-manifest.json --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
                 - aws s3 cp ./build/service-worker.js s3://${AWS::StackName}-website/dev/service-worker.js --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
                 - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
             post_build:
               commands:
                 - echo Build completed on `date`
