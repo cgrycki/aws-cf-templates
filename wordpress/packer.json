@@ -1,0 +1,29 @@
+{
+  "variables": {
+  },
+  "builders": [{
+    "type": "amazon-ebs",
+    "region": "us-east-1",
+    "source_ami_filter": {
+      "filters": {
+      "virtualization-type": "hvm",
+      "name": "amazon/amzn2-ami-hvm-2.*-x86_64-gp2",
+      "root-device-type": "ebs"
+      },
+      "owners": ["137112412989"],
+      "most_recent": true
+    },
+    "instance_type": "t3.small",
+    "ssh_username": "ec2-user",
+    "ami_name": "cph-wordpress {{timestamp}}"
+  }],
+  "provisioners": [{
+    "type": "shell",
+    "inline": ["yum install python-pip",
+               "pip install ansible"]
+  },
+  {
+    "type": "ansible-local",
+    "playbook_file": "playbook.yml"
+  }]
+}

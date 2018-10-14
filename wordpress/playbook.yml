@@ -1,0 +1,41 @@
+---
+- hosts: localhost
+  connection: local
+  sudo: yes
+  
+  tasks:
+  - name: Update all packages
+    yum:
+      name: '*'
+      state: latest
+  - name: Install list of packages
+    yum:
+      name={{item}}
+      state=installed
+    with_items:
+    - php
+    - php-gd
+    - php-opcache
+    - php-mysqlnd
+    - php-mbstring
+    - mariadb
+    - httpd
+  - name: Download shibboleth-sp
+    s3:
+      bucket: cph-shibboleth-sp-rpms
+      object: /latest/shibboleth-sp.tar.gz
+      dest: /tmp/shibboleth-sp/shibboleth-sp.tar.gz
+  - name: Extract shibboleth-sp
+      src: /tmp/shibboleth-sp/shibboleth-sp.tar.gz
+      dest: /tmp/shibboleth-sp
+  - name: Find RPM files
+    find:
+      paths: /tmp/shibboleth-sp
+      patterns: '*.rpm'
+    register: rpm_result
+  - name: Install shibboleth-sp
+    yum:
+      name: '{{ item.path }}'
+      state: present
+    with_items: '{{ rpm_results.files }}'
+  
