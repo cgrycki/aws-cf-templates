@@ -1,41 +1,60 @@
 ---
 - hosts: localhost
   connection: local
-  sudo: yes
   
   tasks:
   - name: Update all packages
     yum:
       name: '*'
       state: latest
+    become: yes
+  - name: Enable amazon-linux-extras packages
+    shell: "amazon-linux-extras enable {{ item }}"
+    become: yes
+    loop:
+      - php7.2
   - name: Install list of packages
     yum:
-      name={{item}}
-      state=installed
-    with_items:
-    - php
-    - php-gd
-    - php-opcache
-    - php-mysqlnd
-    - php-mbstring
-    - mariadb
-    - httpd
+      name:
+      - php
+      - php-gd
+      - php-opcache
+      - php-mysqlnd
+      - php-mbstring
+      - mariadb
+      - httpd
+      state: latest
+    become: yes
+  - name: Create /tmp/shibboleth-sp directory
+    file:
+      path: /tmp/shibboleth-sp
+      state: directory
+      owner: ec2-user
+      group: ec2-user
+      mode: '700'
+    become: yes
   - name: Download shibboleth-sp
-    s3:
-      bucket: cph-shibboleth-sp-rpms
-      object: /latest/shibboleth-sp.tar.gz
+    get_url:
+      url: https://s3.amazonaws.com/cph-shibboleth-sp-rpms/latest/shibboleth-sp.tar.gz
       dest: /tmp/shibboleth-sp/shibboleth-sp.tar.gz
+      mode: '500'
   - name: Extract shibboleth-sp
-    src: /tmp/shibboleth-sp/shibboleth-sp.tar.gz
-    dest: /tmp/shibboleth-sp
+    unarchive:
+      src: /tmp/shibboleth-sp/shibboleth-sp.tar.gz
+      dest: /tmp/shibboleth-sp
   - name: Find RPM files
     find:
       paths: /tmp/shibboleth-sp
       patterns: '*.rpm'
-    register: rpm_result
+      recurse: yes
+    register: rpm_results
+  - set_fact:
+      rpm_list: "{{ rpm_results.files | map(attribute='path') | list}}"
   - name: Install shibboleth-sp
     yum:
-      name: '{{ item.path }}'
-      state: present
-    with_items: '{{ rpm_results.files }}'
-  
+      name: '{{ rpm_list }}'
+      state: installed
+    become: yes
+  - name: Configure PHP
+    shell: "bash /tmp/scripts/php.sh"
+    become: yes

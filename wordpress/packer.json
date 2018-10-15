@@ -7,20 +7,32 @@
     "source_ami_filter": {
       "filters": {
       "virtualization-type": "hvm",
-      "name": "amazon/amzn2-ami-hvm-2.*-x86_64-gp2",
+      "name": "amzn2-ami-hvm-2.0.????????-x86_64-gp2",
       "root-device-type": "ebs"
       },
       "owners": ["137112412989"],
       "most_recent": true
     },
-    "instance_type": "t3.small",
+    "instance_type": "t2.small",
     "ssh_username": "ec2-user",
     "ami_name": "cph-wordpress {{timestamp}}"
   }],
   "provisioners": [{
     "type": "shell",
-    "inline": ["yum install python-pip",
-               "pip install ansible"]
+    "inline": ["sudo yum install -y python-pip",
+               "sudo pip install ansible",
+               "sudo mkdir /tmp/scripts",
+               "sudo chown ec2-user /tmp/scripts",
+               "sudo chmod 700 /tmp/scripts"]
+  },
+  { 
+    "type": "file",
+    "source": "php.sh",
+    "destination": "/tmp/scripts/php.sh"
+  },
+  {
+    "type": "shell",
+    "inline": ["sudo chmod +x /tmp/scripts/php.sh"]
   },
   {
     "type": "ansible-local",
