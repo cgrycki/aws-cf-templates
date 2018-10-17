@@ -120,7 +120,7 @@ Parameters:
     AllowedValues:
     - true
     - false
-    WebServerInstanceType:
+  WebServerInstanceType:
     Description: 'The instance type of web servers (e.g. t2.micro).'
     Type: String
     Default: 't2.micro'
