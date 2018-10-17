@@ -23,6 +23,7 @@
       - php-mbstring
       - mariadb
       - httpd
+      - amazon-efs-utils
       state: latest
     become: yes
   - name: Create /tmp/shibboleth-sp directory
