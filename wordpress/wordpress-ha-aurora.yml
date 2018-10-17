@@ -138,7 +138,6 @@ Parameters:
     Type: Number
     Default: 30
     Type: String
-    Default: 'www'
 
 Conditions:
   HasKeyName: !Not [!Equals [!Ref WebServerKeyName, '']]
