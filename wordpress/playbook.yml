@@ -24,6 +24,7 @@
       - mariadb
       - httpd
       - amazon-efs-utils
+      - awslogs
       state: latest
     become: yes
   - name: Create /tmp/shibboleth-sp directory
