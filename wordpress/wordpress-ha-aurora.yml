@@ -732,11 +732,19 @@ Resources:
                 - 'b_configure_sshd_commanduser'
         config:
           commands:
-            'a_configure_apache':
+            'a_download_document_roots_script':
+              command: !Sub
+                - 'aws s3 cp s3://${Bucket}/initialize_docroots.sh /tmp/initialize_docroots.sh'
+                - { Bucket: !Ref ConfigBucket }
+            'b_set_execute_bit': 
+              command: 'chmod +x /tmp/initialize_docroots.sh'
+            'c_execute_document_roots_script':
+              command: '/tmp/initialize_docroots.sh'
+            'd_configure_apache':
               command: !Sub
                 - 'aws s3 cp --recursive s3://${Bucket}/apache/ /etc/httpd/'
                 - { Bucket: !Ref ConfigBucket }
-            'b_configure_shibboleth':
+            'e_configure_shibboleth':
               command: !Sub
                 - 'aws s3 cp --recursive s3://${Bucket}/shibboleth/ /etc/shibboleth/'
                 - { Bucket: !Ref ConfigBucket }
@@ -746,8 +754,11 @@ Resources:
                 enabled: true
                 ensureRunning: true
                 commands:
-                - 'a_configure_apache'
-                - 'b_configure_shibboleth'
+                - 'a_download_document_roots_script'
+                - 'b_set_execute_but'
+                - 'c_execute_document_roots_script'
+                - 'd_configure_apache'
+                - 'e_configure_shibboleth'
               amazon-ssm-agent:
                 enabled: !If [HasSystemsManagerAccess, true, false]
                 ensureRunning: !If [HasSystemsManagerAccess, true, false]
