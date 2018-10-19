@@ -37,5 +37,9 @@
   {
     "type": "ansible-local",
     "playbook_file": "playbook.yml"
+  },
+  {
+    "type": "shell",
+    "inline": ["sudo rm -rf /tmp/*"]
   }]
 }
