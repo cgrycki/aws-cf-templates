@@ -53,6 +53,12 @@ Metadata:
       Parameters:
       - DBServerInstanceType
       - DBBackupRetentionPeriod
+    - Label:
+        default: 'SFTP Server'
+      Parameters:
+      - SFTPServerInstanceType
+      - SFTPServerAMI
+      - SFTPServerIAMUserPrefix
 Parameters:
   ParentSSHBastionStack:
     Description: 'Optional but recommended stack name of parent SSH bastion host/instance stack based on vpc/vpc-*-bastion.yaml template.'
