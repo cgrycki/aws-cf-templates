@@ -755,7 +755,7 @@ Resources:
                 ensureRunning: true
                 commands:
                 - 'a_download_document_roots_script'
-                - 'b_set_execute_but'
+                - 'b_set_execute_bit'
                 - 'c_execute_document_roots_script'
                 - 'd_configure_apache'
                 - 'e_configure_shibboleth'
