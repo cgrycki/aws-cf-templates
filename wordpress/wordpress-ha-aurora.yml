@@ -494,6 +494,15 @@ Resources:
             - 'logs:PutLogEvents'
             - 'logs:DescribeLogStreams'
             Resource: !GetAtt 'WebServerLogs.Arn'
+      - PolicyName: elasticips
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - 'ec2:AssociateAddress'
+            - 'ec2:DescribeAddresses'
+            Resource: '*'
   WebServerIAMPolicySSHAccess:
     Type: 'AWS::IAM::Policy'
     Condition: HasIAMUserSSHAccess
@@ -516,7 +525,7 @@ Resources:
           Resource:
           - !Sub 'arn:aws:iam::${AWS::AccountId}:user/${WebServerIAMUserPrefix}*'
   LaunchConfiguration:
-    DependsOn: [DatabaseA, DatabaseB]
+    DependsOn: [DatabaseA, DatabaseB, ElasticIP1, ElasticIP2, ElasticIP3, ElasticIP4]
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
       'AWS::CloudFormation::Init':
@@ -731,20 +740,44 @@ Resources:
                 - 'a_configure_sshd_command'
                 - 'b_configure_sshd_commanduser'
         config:
+          files:
+            '/root/wordpress.sh':
+              content: |
+                #!/bin/bash -ex
+                # ensure than only one machine installs wp
+                if mkdir /var/www/lock; then
+                  cd /tmp
+                  wget -q -T 60 https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+                  for d in /var/www/*; do
+                    cd $d
+                    if ! php /tmp/wp-cli.phar core is-installed --allow-root; then
+                      dname=$(basename $d)
+                      php /tmp/wp-cli.phar core download --allow-root
+                      chown -R apache:webadmins $d
+                      find . -type f -exec chmod 664 {} +
+                      find . -type d -exec chmod 775 {} +
+                      chmod 660 $d/wp-config.php
+                    fi
+                  done
+                  rm -f /tmp/wp-cli.phar
+                fi
+                rm -rf /var/www/lock
           commands:
             'a_download_document_roots_script':
               command: !Sub
-                - 'aws s3 cp s3://${Bucket}/initialize_docroots.sh /tmp/initialize_docroots.sh'
+                - 'aws s3 cp s3://${Bucket}/initialize_docroots.sh /root/initialize_docroots.sh'
                 - { Bucket: !Ref ConfigBucket }
             'b_set_execute_bit': 
-              command: 'chmod +x /tmp/initialize_docroots.sh'
+              command: 'chmod +x /root/initialize_docroots.sh'
             'c_execute_document_roots_script':
-              command: '/tmp/initialize_docroots.sh'
-            'd_configure_apache':
+              command: '/root/initialize_docroots.sh'
+            'd_download_wordpress':
+              command: '/root/wordpress.sh'
+            'e_configure_apache':
               command: !Sub
                 - 'aws s3 cp --recursive s3://${Bucket}/apache/ /etc/httpd/'
                 - { Bucket: !Ref ConfigBucket }
-            'e_configure_shibboleth':
+            'f_configure_shibboleth':
               command: !Sub
                 - 'aws s3 cp --recursive s3://${Bucket}/shibboleth/ /etc/shibboleth/'
                 - { Bucket: !Ref ConfigBucket }
@@ -757,8 +790,9 @@ Resources:
                 - 'a_download_document_roots_script'
                 - 'b_set_execute_bit'
                 - 'c_execute_document_roots_script'
-                - 'd_configure_apache'
-                - 'e_configure_shibboleth'
+                - 'd_download_wordpress'
+                - 'e_configure_apache'
+                - 'f_configure_shibboleth'
               amazon-ssm-agent:
                 enabled: !If [HasSystemsManagerAccess, true, false]
                 ensureRunning: !If [HasSystemsManagerAccess, true, false]
@@ -774,10 +808,11 @@ Resources:
         'Fn::Base64': !Sub |
           #!/bin/bash -ex
           trap '/opt/aws/bin/cfn-signal -e 1 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}' ERR
+          aws-ec2-assign-elastic-ip --region ${AWS::Region} --valid-ips ${ElasticIP1},${ElasticIP2},${ElasticIP3},${ElasticIP4}
           while ! (echo > /dev/tcp/${EFSFileSystem}.efs.${AWS::Region}.amazonaws.com/2049) >/dev/null 2>&1; do sleep 10; done
           sleep 10
           mkdir -p /var/www
-          mount -t efs -o tls "${EFSFileSystem}:/" /var/www/
+          mount -t efs "${EFSFileSystem}:/" /var/www/
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource LaunchConfiguration --region ${AWS::Region}
           /opt/aws/bin/cfn-signal -e 0 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}
   AutoScalingGroup:
@@ -1031,6 +1066,22 @@ Resources:
           AcmCertificateArn: !Ref CloudFrontAcmCertificate
           SslSupportMethod: 'sni-only'
           MinimumProtocolVersion: TLSv1
+  ElasticIP1:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: 'vpc'
+  ElasticIP2:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: 'vpc'
+  ElasticIP3:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: 'vpc'
+  ElasticIP4:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: 'vpc'
 Outputs:
   TemplateID:
     Description: 'cloudonaut.io template id.'
