@@ -301,7 +301,7 @@ Resources:
       - !Ref LoadBalancerSecurityGroup
       LoadBalancerAttributes:
       - Key: idle_timeout.timeout_seconds
-        Value: '50'
+        Value: '30'
       Scheme: 'internet-facing'
   LoadBalancerListener:
     Type: 'AWS::ElasticLoadBalancingV2::Listener'
