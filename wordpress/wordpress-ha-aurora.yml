@@ -757,6 +757,9 @@ Resources:
                       find . -type f -exec chmod 664 {} +
                       find . -type d -exec chmod 775 {} +
                       chmod 660 $d/wp-config.php
+                      echo '/** return content using HTTPS */' >> $d/wp-config.php
+                      echo 'if (strpos($_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false)' >> $d/wp-config.php
+                      echo '       $_SERVER['HTTPS']='on';' >> $d/wp-config
                     fi
                   done
                   rm -f /tmp/wp-cli.phar
