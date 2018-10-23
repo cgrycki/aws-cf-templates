@@ -18,7 +18,7 @@ Parameters:
   # CUSTOM: source efs security group, adds new ingress rule
   SrcEFSSecurityGroup:
     Description: Source EFS security group Id
-    Type: String
+    Type: AWS::EC2::SecurityGroup::Id
   
   # CUSTOM: EC2 instance type
   EC2InstanceType:
