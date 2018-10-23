@@ -19,6 +19,20 @@ Parameters:
   SrcEFSSecurityGroup:
     Description: Source EFS security group Id
     Type: String
+  
+  # CUSTOM: EC2 instance type
+  EC2InstanceType:
+    Description: Type of compute-optimized EC2 instance. Adjust for required throughput.
+    Type: String
+    Default: c5.xlarge
+    AllowedValues:
+    - c5.large 
+    - c5.xlarge 
+    - c5.2xlarge 
+    - c5.4xlarge 
+    - c5.9xlarge 
+    - c5.18xlarge 
+    ConstraintDescription: must be a valid EC2 instance type.
 
   # Interval tag for your backups; daily, weekly, monthly
   IntervalTag:
@@ -153,6 +167,7 @@ Metadata:
         Parameters:
           - Subnets
           - VpcId
+          - EC2InstanceType
       - Label:
           default: Notification & Dashboard
         Parameters:
@@ -168,6 +183,8 @@ Metadata:
         default: Source EFS
       SrcEFSSecurityGroup:
         default: Source EFS Security Group
+      EC2InstanceType:
+        default: EC2 Instance Type
       FolderLabel:
         default: Folder Label
       BackupWindow:
@@ -189,21 +206,6 @@ Mappings:
   Map:
     encryption: {"Yes": "true", "No": "false"}
     send-data: {"SendAnonymousData": "Yes"}
-    c5.xlarge: {"Arch":"HVM64"}
-    us-east-1: {"InstanceSize":"c5.xlarge"}
-    us-east-2: {"InstanceSize":"c5.xlarge"}
-    us-west-1: {"InstanceSize":"c5.xlarge"}
-    us-west-2: {"InstanceSize":"c5.xlarge"}
-    ca-central-1: {"InstanceSize":"c5.xlarge"}
-    eu-west-1: {"InstanceSize":"c5.xlarge"}
-    eu-central-1: {"InstanceSize":"c5.xlarge"}
-    eu-west-2: {"InstanceSize":"c5.xlarge"}
-    ap-southeast-1: {"InstanceSize":"c5.xlarge"}
-    ap-southeast-2: {"InstanceSize":"c5.xlarge"}
-    ap-northeast-1: {"InstanceSize":"c5.xlarge"}
-    ap-northeast-2: {"InstanceSize":"c5.xlarge"}
-    ap-south-1: {"InstanceSize":"c5.xlarge"}
-    sa-east-1: {"InstanceSize":"c5.xlarge"}
 
 Conditions:
   DashboardOpt: !Equals [ !Ref Dashboard, "Yes" ]
@@ -274,7 +276,7 @@ Resources:
       ImageId: !GetAtt AMIInfo.Id
       SecurityGroups:
         - !Sub ${EFSSecurityGroup}
-      InstanceType: !FindInMap [Map, !Ref "AWS::Region", "InstanceSize"]
+      InstanceType: !Ref EC2InstanceType
       IamInstanceProfile: !Sub ${InstanceProfile}
       UserData:
         # download and run efs-backup script
@@ -323,7 +325,7 @@ Resources:
       Description: EFS Backup - Lambda function to create EFS backups
       Environment:
         Variables:
-          instance_type: !FindInMap [Map, !Ref "AWS::Region", "InstanceSize"]
+          instance_type: !Ref EC2InstanceType
           autoscaling_group_name: !Sub ${EFSAutoScalingGroup}
           source_efs: !Sub ${SrcEFS}
           destination_efs: !Sub ${DstEFS}
@@ -624,7 +626,7 @@ Resources:
     Properties:
       ServiceToken: !GetAtt AMIInfoFunction.Arn
       Region: !Ref "AWS::Region"
-      Architecture: !FindInMap [Map, !FindInMap [Map, !Ref "AWS::Region", "InstanceSize"], "Arch"]
+      Architecture: HVM64
 
   SolutionHelper:
     Type: AWS::Lambda::Function
