@@ -497,15 +497,6 @@ Resources:
             - 'logs:PutLogEvents'
             - 'logs:DescribeLogStreams'
             Resource: !GetAtt 'WebServerLogs.Arn'
-      - PolicyName: elasticips
-        PolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-          - Effect: Allow
-            Action:
-            - 'ec2:AssociateAddress'
-            - 'ec2:DescribeAddresses'
-            Resource: '*'
   WebServerIAMPolicySSHAccess:
     Type: 'AWS::IAM::Policy'
     Condition: HasIAMUserSSHAccess
@@ -528,7 +519,7 @@ Resources:
           Resource:
           - !Sub 'arn:aws:iam::${AWS::AccountId}:user/${WebServerIAMUserPrefix}*'
   LaunchConfiguration:
-    DependsOn: [DatabaseA, DatabaseB, ElasticIP1, ElasticIP2, ElasticIP3, ElasticIP4]
+    DependsOn: [DatabaseA, DatabaseB]
     Type: 'AWS::AutoScaling::LaunchConfiguration'
     Metadata:
       'AWS::CloudFormation::Init':
@@ -814,7 +805,6 @@ Resources:
         'Fn::Base64': !Sub |
           #!/bin/bash -ex
           trap '/opt/aws/bin/cfn-signal -e 1 --stack ${AWS::StackName} --resource AutoScalingGroup --region ${AWS::Region}' ERR
-          aws-ec2-assign-elastic-ip --region ${AWS::Region} --valid-ips ${ElasticIP1},${ElasticIP2},${ElasticIP3},${ElasticIP4}
           while ! (echo > /dev/tcp/${EFSFileSystem}.efs.${AWS::Region}.amazonaws.com/2049) >/dev/null 2>&1; do sleep 10; done
           sleep 10
           mkdir -p /var/www
@@ -1072,22 +1062,6 @@ Resources:
           AcmCertificateArn: !Ref CloudFrontAcmCertificate
           SslSupportMethod: 'sni-only'
           MinimumProtocolVersion: TLSv1
-  ElasticIP1:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: 'vpc'
-  ElasticIP2:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: 'vpc'
-  ElasticIP3:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: 'vpc'
-  ElasticIP4:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: 'vpc'
 Outputs:
   TemplateID:
     Description: 'cloudonaut.io template id.'

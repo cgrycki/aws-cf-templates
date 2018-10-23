@@ -21,7 +21,6 @@
     "type": "shell",
     "inline": ["sudo yum install -y python-pip",
                "sudo pip install ansible",
-               "sudo pip install aws-ec2-assign-elastic-ip",
                "sudo mkdir /tmp/scripts",
                "sudo chown ec2-user /tmp/scripts",
                "sudo chmod 700 /tmp/scripts"]
