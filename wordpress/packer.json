@@ -4,6 +4,9 @@
   "builders": [{
     "type": "amazon-ebs",
     "region": "us-east-1",
+    "vpc_id": "vpc-9d0d02e5",
+    "subnet_id": "subnet-8cbb92c7",
+    "associate_public_ip_address": true,
     "source_ami_filter": {
       "filters": {
       "virtualization-type": "hvm",
@@ -24,15 +27,6 @@
                "sudo mkdir /tmp/scripts",
                "sudo chown ec2-user /tmp/scripts",
                "sudo chmod 700 /tmp/scripts"]
-  },
-  { 
-    "type": "file",
-    "source": "php.sh",
-    "destination": "/tmp/scripts/php.sh"
-  },
-  {
-    "type": "shell",
-    "inline": ["sudo chmod +x /tmp/scripts/php.sh"]
   },
   {
     "type": "ansible-local",
