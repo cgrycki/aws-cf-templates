@@ -57,6 +57,19 @@
       name: '{{ rpm_list }}'
       state: installed
     become: yes
-  - name: Configure PHP
-    shell: "bash /tmp/scripts/php.sh"
+  - name: Create webadmins group
+    group:
+      name: webadmins
+      gid: 1007
+    become: yes
+  - name: Add users to webadmins
+    user:
+      name: apache
+      groups: webadmins
+      append: yes
+    become: yes
+    user:
+      name: ec2-user
+      groups: webadmins
+      append: yes
     become: yes
