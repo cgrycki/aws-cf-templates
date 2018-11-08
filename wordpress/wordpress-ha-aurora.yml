@@ -35,6 +35,7 @@ Metadata:
         default: 'Domain Name and SSL certificates'
       Parameters:
       - DomainName
+      - AltDomainNames
       - CloudFrontAcmCertificate
       - ElbAcmCertificate
     - Label:
@@ -84,6 +85,9 @@ Parameters:
   DomainName:
     Description: 'The primary domain name of the blog.'
     Type: String
+  AltDomainNames:
+    Description: 'A comma delimited list of alternative domain names, including primary domain name.'
+    Type: CommaDelimitedList
   CloudFrontAcmCertificate:
     Description: 'The ACM Certificate ARN for the CloudFront distribution. Must be created in the us-east-1 region!'
     Type: String
@@ -195,15 +199,6 @@ Resources:
       FromPort: 22
       ToPort: 22
       SourceSecurityGroupId: {'Fn::ImportValue': !Sub '${ParentSSHBastionStack}-SecurityGroup'}
-  WebServerSecurityGroupInSSHWorld:
-    Type: 'AWS::EC2::SecurityGroupIngress'
-    Condition: HasNotSSHBastionSecurityGroup
-    Properties:
-      GroupId: !Ref WebServerSecurityGroup
-      IpProtocol: tcp
-      FromPort: 22
-      ToPort: 22
-      CidrIp: '0.0.0.0/0'
   DatabaseSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
@@ -524,7 +519,7 @@ Resources:
     Metadata:
       'AWS::CloudFormation::Init':
         configSets:
-          default: !If [HasIAMUserSSHAccess, [awslogs, ssh-access, config], [awslogs, config]]
+          default: !If [HasIAMUserSSHAccess, [awslogs, s3configfiles, shibboleth, ssh-access, config], [awslogs, s3configfiles, shibboleth, config]]
         awslogs:
           packages:
             yum:
@@ -669,6 +664,32 @@ Resources:
                 - '/etc/awslogs/awscli.conf'
                 - '/etc/awslogs/config/efs.conf'
                 - '/etc/awslogs/config/httpd.conf'
+        shibboleth:
+          services:
+            sysvinit:
+                shibd:
+                  enabled: true
+                  ensureRunning: true
+        s3configfiles:
+          commands:
+            'a_download_s3_config_files':
+              command: !Sub
+                - 'aws s3 cp --recursive s3://${Bucket}/root/ /'
+                - { Bucket: !Ref ConfigBucket }
+            'b_set_permissions_etc-php.ini':
+              command: 'chown root:root /etc/php.ini && chmod 644 /etc/php.ini'
+            'c_set_permissions_etc-php.d':
+              command: 'chown -R root:root /etc/php.d && find /etc/php.d -type f -exec chmod 644 -- {} +'
+            'd_set_permissions_etc-httpd-conf-httpd.conf':
+              command: 'chown root:root /etc/httpd/conf/httpd.conf && chmod 644 /etc/httpd/conf/httpd.conf'
+            'e_set_permissions_etc-httpd-conf.d':
+              command: 'chown -R root:root /etc/httpd/conf.d && find /etc/httpd/conf.d -type f -exec chmod 644 -- {} +'
+            'f_set_permissions_etc-httpd-conf.modules.d':
+              command: 'chown -R root:root /etc/httpd/conf.modules.d && find /etc/httpd/conf.modules.d -type f -exec chmod 644 -- {} +'
+            'g_set_permissions_etc-awslogs-config':
+              command: 'chown -R root:root /etc/awslogs/config && find /etc/awslogs/config -type f -exec chmod 644 -- {} +'
+            'h_set_permissions_usr-share-php':
+              command: 'chown -R root:root /usr/share/php && find /usr/share/php -type f -exec chmod 555 -- {} +'
         ssh-access:
           files:
             '/opt/authorized_keys_command.sh':
@@ -700,9 +721,10 @@ Resources:
                   if [ "${#SaveUserName}" -le "32" ]; then
                     if ! id -u "$SaveUserName" >/dev/null 2>&1; then
                       #sudo will read each file in /etc/sudoers.d, skipping file names that end in ‘~’ or contain a ‘.’ character to avoid causing problems with package manager or editor temporary/backup files.
-                      SaveUserFileName=$(echo "$SaveUserName" | tr "." " ")
+                      # Remove sudo access
+                      #SaveUserFileName=$(echo "$SaveUserName" | tr "." " ")
                       /usr/sbin/useradd "$SaveUserName"
-                      echo "$SaveUserName ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$SaveUserFileName"
+                      #echo "$SaveUserName ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$SaveUserFileName"
                     fi
                   else
                     echo "Can not import IAM user ${SaveUserName}. User name is longer than 32 characters."
@@ -735,61 +757,141 @@ Resources:
                 - 'b_configure_sshd_commanduser'
         config:
           files:
+            '/root/initialize_docroots.sh':
+              content: !Sub |
+                #!/bin/bash -ex
+                # detect virtual host document roots and initialize them if they do not exist
+                vhost_docroots=$(grep -roPh '[^#+][[:space:]]*DocumentRoot \"\K([^\0]+)(?=\")' /etc/httpd/conf.d/*.conf /etc/httpd/conf/httpd.conf)
+                for i in $vhost_docroots; do
+                    if [ ! -d $i ]; then
+                        /usr/bin/mkdir -p $i
+                        chown apache:webadmins $i
+                        chmod 775 $i
+                    fi
+                done
+              mode: '000550'
+              owner: root
+              group: root
+            '/root/.htaccess':
+              content: |
+                # BEGIN WordPress
+                <IfModule mod_rewrite.c>
+                RewriteEngine On
+                RewriteBase /
+                RewriteRule ^index\.php$ - [L]
+                RewriteCond %{REQUEST_FILENAME} !-f
+                RewriteCond %{REQUEST_FILENAME} !-d
+                RewriteRule . /index.php [L]
+                </IfModule>
+
+                # END WordPress
+                # BEGIN Shibboleth
+                <RequireAll>
+                  AuthType shibboleth
+                  ShibRequestSetting requireSession false
+                  Require shibboleth
+                </RequireAll>
+                # END Shibboleth
+                # START cache-control
+                <IfModule mod_expires.c>
+                  # Enable Expiration
+                  ExpiresActive on
+                  # Default Directive
+                  ExpiresDefault "access plus 1 month"
+                  # Favicon
+                  ExpiresByType image/x-ico "access plus 1 month"
+                  ExpiresByType image/x-icon "access plus 1 month"
+                  # Images
+                  ExpiresByType image/gif "access plus 1 month"
+                  ExpiresByType image/png "access plus 1 month"
+                  ExpiresByType image/jpg "access plus 1 month"
+                  ExpiresByType image/jpeg "access plus 1 month"
+                  # TEXT/Wording/RSS Feed
+                  ExpiresByType text/html "access plus 1 week"
+                  ExpiresByType text/xml "access plus 1 seconds"
+                  ExpiresByType text/plain "access plus 1 seconds"
+                  ExpiresByType application/xml "access plus 1 seconds"
+                  ExpiresByType application/rss+xml "access plus 1 seconds"
+                  ExpiresByType application/json "access plus 1 seconds"
+                  ExpiresByType image/svg+xml "access plus 1 week"
+                  # CSS Stylesheet
+                  ExpiresByType text/css "access plus 1 week"
+                  # JavaScripts
+                  ExpiresByType text/javascript "access plus 1 week"
+                  ExpiresByType application/javascript "access plus 1 week"
+                  ExpiresByType application/x-javascript "access plus 1 week"
+                  # PDF files
+                  ExpiresByType application/pdf "access plus 1 month"
+                  # The next few lines remove the Last-Modified, Pragma, and ETag Headers
+                  <IfModule mod_headers.c>
+                    Header append Cache-Control "must-revalidate"
+                  </IfModule>
+                </IfModule>
+                # END cache-control
+              mode: '000664'
+              owner: root
+              group: root
             '/root/wordpress.sh':
               content: |
                 #!/bin/bash -ex
-                # ensure than only one machine installs wp
+                # Verify that all PHP scripts in the include path pass a syntax check
+                for i in /usr/share/php/*.php; do 
+                  php -l $i;
+                  exit_code=$?
+                  if [ "$exit_code" != "0" ]; then
+                    echo "Exiting, syntax errors found in $i"
+                    exit $exit_code
+                  fi
+                done
+                # ensure that only one machine installs wp
                 if mkdir /var/www/lock; then
                   cd /tmp
                   wget -q -T 60 https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
                   for d in /var/www/*; do
-                    cd $d
-                    if ! php /tmp/wp-cli.phar core is-installed --allow-root; then
-                      dname=$(basename $d)
-                      php /tmp/wp-cli.phar core download --allow-root
-                      chown -R apache:webadmins $d
-                      find . -type f -exec chmod 664 {} +
-                      find . -type d -exec chmod 775 {} +
-                      chmod 660 $d/wp-config.php
-                      echo '/** return content using HTTPS */' >> $d/wp-config.php
-                      echo 'if (strpos($_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false)' >> $d/wp-config.php
-                      echo '       $_SERVER['HTTPS']='on';' >> $d/wp-config
+                    if [ $d != '/var/www/healthcheck' ] && [ $d != '/var/www/lock' ]; then
+                      cd $d
+                      if ! php /tmp/wp-cli.phar core is-installed --allow-root; then
+                        dname=$(basename $d)
+                        if php /tmp/wp-cli.phar core download --allow-root; then
+                          chown -R apache:webadmins $d
+                          find . -type f -exec chmod 664 {} +
+                          find . -type d -exec chmod 775 {} +
+                          find . -type d -exec chmod g+s {} +
+                        fi
+                      fi
+                      if [ -f $d/wp-config.php ]; then
+                        chmod 660 $d/wp-config.php
+                      fi
+                      if [ ! -f $d/.htaccess ]; then
+                        # copy over default .htaccess
+                        cp /root/.htaccess $d/.htaccess
+                        chown apache:webadmins $d/.htaccess
+                        chmod 664 $d/.htaccess
+                      fi
                     fi
                   done
                   rm -f /tmp/wp-cli.phar
                 fi
                 rm -rf /var/www/lock
+              mode: '000550'
+              owner: root
+              group: root 
           commands:
-            'a_download_document_roots_script':
-              command: !Sub
-                - 'aws s3 cp s3://${Bucket}/initialize_docroots.sh /root/initialize_docroots.sh'
-                - { Bucket: !Ref ConfigBucket }
-            'b_set_execute_bit': 
-              command: 'chmod +x /root/initialize_docroots.sh'
-            'c_execute_document_roots_script':
+            'a_execute_document_roots_script':
               command: '/root/initialize_docroots.sh'
-            'd_download_wordpress':
+            'b_download_wordpress':
               command: '/root/wordpress.sh'
-            'e_configure_apache':
-              command: !Sub
-                - 'aws s3 cp --recursive s3://${Bucket}/apache/ /etc/httpd/'
-                - { Bucket: !Ref ConfigBucket }
-            'f_configure_shibboleth':
-              command: !Sub
-                - 'aws s3 cp --recursive s3://${Bucket}/shibboleth/ /etc/shibboleth/'
-                - { Bucket: !Ref ConfigBucket }
           services:
             sysvinit:
               httpd:
                 enabled: true
                 ensureRunning: true
                 commands:
-                - 'a_download_document_roots_script'
-                - 'b_set_execute_bit'
-                - 'c_execute_document_roots_script'
-                - 'd_download_wordpress'
-                - 'e_configure_apache'
-                - 'f_configure_shibboleth'
+                - 'a_execute_document_roots_script'
+                - 'b_download_wordpress'
+              php-fpm:
+                enabled: true
+                ensureRunning: true
               amazon-ssm-agent:
                 enabled: !If [HasSystemsManagerAccess, true, false]
                 ensureRunning: !If [HasSystemsManagerAccess, true, false]
@@ -842,10 +944,10 @@ Resources:
         Key: Name
     CreationPolicy:
       ResourceSignal:
-        Timeout: PT10M
+        Timeout: PT30M
     UpdatePolicy:
       AutoScalingRollingUpdate:
-        PauseTime: PT10M
+        PauseTime: PT30M
         SuspendProcesses:
         - HealthCheck
         - ReplaceUnhealthy
@@ -986,8 +1088,7 @@ Resources:
     Type: 'AWS::CloudFront::Distribution'
     Properties:
       DistributionConfig:
-        Aliases:
-        - !Ref DomainName
+        Aliases: !Ref AltDomainNames
         Comment: !Ref DomainName
         Origins:
         - DomainName: !GetAtt 'LoadBalancer.DNSName'
@@ -996,6 +1097,36 @@ Resources:
             OriginProtocolPolicy: 'https-only'
             OriginReadTimeout: 60
         DefaultCacheBehavior:
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 86400
+          MaxTTL: 315360000
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - 'Host'
+            - 'Origin'
+            Cookies:
+              Forward: whitelist
+              WhitelistedNames:
+                - comment_author_*
+                - comment_author_email_*
+                - comment_author_url_*
+                - wordpress_logged_in_*
+                - wordpress_test_cookie
+                - wp-settings-*
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        CacheBehaviors:
+        - PathPattern: wp-admin/*
           AllowedMethods:
           - DELETE
           - GET
@@ -1016,8 +1147,7 @@ Resources:
           TargetOriginId: elb
           ViewerProtocolPolicy: 'redirect-to-https'
           Compress: true
-        CacheBehaviors:
-        - PathPattern: wp-includes/*
+        - PathPattern: wp-login.php
           AllowedMethods:
           - DELETE
           - GET
@@ -1026,13 +1156,162 @@ Resources:
           - PATCH
           - POST
           - PUT
-          DefaultTTL: 900
-          MaxTTL: 900
-          MinTTL: 900
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
           ForwardedValues:
             QueryString: true
             Headers:
-            - 'Host'
+            - '*'
+            Cookies:
+              Forward: all
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        - PathPattern: wp-signup.php
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - '*'
+            Cookies:
+              Forward: all
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        - PathPattern: wp-trackback.php
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - '*'
+            Cookies:
+              Forward: all
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        - PathPattern: xmlrpc.php
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - '*'
+            Cookies:
+              Forward: all
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        - PathPattern: wp-cron.php
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - '*'
+            Cookies:
+              Forward: all
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        - PathPattern: contact/
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - '*'
+            Cookies:
+              Forward: all
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        - PathPattern: Shibboleth.sso
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - '*'
+            Cookies:
+              Forward: all
+          TargetOriginId: elb
+          ViewerProtocolPolicy: 'redirect-to-https'
+          Compress: true
+        - PathPattern: Shibboleth.sso/*
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          DefaultTTL: 0
+          MaxTTL: 0
+          MinTTL: 0
+          ForwardedValues:
+            QueryString: true
+            Headers:
+            - '*'
+            Cookies:
+              Forward: all
           TargetOriginId: elb
           ViewerProtocolPolicy: 'redirect-to-https'
           Compress: true
@@ -1045,13 +1324,16 @@ Resources:
           - PATCH
           - POST
           - PUT
-          DefaultTTL: 900
-          MaxTTL: 900
-          MinTTL: 900
+          DefaultTTL: 86400
+          MaxTTL: 315360000
+          MinTTL: 0
           ForwardedValues:
             QueryString: true
             Headers:
             - 'Host'
+            - 'Origin'
+            Cookies:
+              Forward: none
           TargetOriginId: elb
           ViewerProtocolPolicy: 'redirect-to-https'
           Compress: true
