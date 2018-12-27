@@ -54,6 +54,18 @@ Parameters:
       - 'S'
       - 'N'
       - 'B'
+  TTLAttribute1:
+    Type: String
+    Description: TTL Attribute for first table (Optional)
+  TTLAttribute2:
+    Type: String
+    Description: TTL Attribute for second table (Optional)
+  TTLAttribute3:
+    Type: String
+    Description: TTL Attribute for third table (Optional)
+  TTLAttribute4:
+    Type: String
+    Description: TTL Attribute for fourth table (Optional)
   ReadCapacityUnitsInitial:
     Type: Number
     Description: Initially provisioned read capacity units
@@ -107,6 +119,34 @@ Parameters:
     AllowedValues:
       - True
       - False
+  PITRTable1:
+    Type: String
+    Description: Enable point-in-time recovery on table 1
+    Default: True
+    AllowedValues:
+      - True
+      - False
+  PITRTable2:
+    Type: String
+    Description: Enable point-in-time recovery on table 2
+    Default: True
+    AllowedValues:
+      - True
+      - False
+  PITRTable3:
+    Type: String
+    Description: Enable point-in-time recovery on table 3
+    Default: True
+    AllowedValues:
+      - True
+      - False
+  PITRTable4:
+    Type: String
+    Description: Enable point-in-time recovery on table 4
+    Default: True
+    AllowedValues:
+      - True
+      - False
   IAMGroups:
     Type: CommaDelimitedList
     Description: Comma delimited list of IAM groups that will be granted read/write access to tables
@@ -131,6 +171,10 @@ Metadata:
           - KeyAttributeType3
           - KeyAttributeName4
           - KeyAttributeType4
+          - TTLAttribute1
+          - TTLAttribute2
+          - TTLAttribute3
+          - TTLAttribute4
       - Label:
           default: Performance and Autoscaling
         Parameters:
@@ -143,6 +187,13 @@ Metadata:
           - TargetValue
           - ScaleInCooldown
           - ScaleOutCooldown
+      - Label:
+          default: Backups
+        Parameters:
+          - PITRTable1
+          - PITRTable2
+          - PITRTable3
+          - PITRTable4
       - Label:
           default: Security
         Parameters:
@@ -171,6 +222,27 @@ Metadata:
         default: Scale In Cooldown
       ScaleOutCooldown:
         default: Scale Out Cooldown
+      PITRTable1:
+        default: Table 1 Point-In-Time Recovery
+      PITRTable2:
+        default: Table 2 Point-In-Time Recovery
+      PITRTable3:
+        default: Table 3 Point-In-Time Recovery
+      PITRTable4:
+        default: Table 4 Point-In-Time Recovery
+      TTLAttribute1:
+        default: Table 1 TTL Attribute
+      TTLAttribute2:
+        default: Table 2 TTL Attribute
+      TTLAttribute3:
+        default: Table 3 TTL Attribute
+      TTLAttribute4:
+        default: Table 4 TTL Attribute
+Conditions:
+  UseTTLTable1: !Not [!Equals [!Ref TTLAttribute1, '']]
+  UseTTLTable2: !Not [!Equals [!Ref TTLAttribute2, '']]
+  UseTTLTable3: !Not [!Equals [!Ref TTLAttribute3, '']]
+  UseTTLTable4: !Not [!Equals [!Ref TTLAttribute4, '']]
 Resources:
   DynamoDBTable1TEST:
     Type: AWS::DynamoDB::Table
@@ -185,8 +257,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable1
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable1
+          - AttributeName: !Ref TTLAttribute1
+            Enabled: True
+          - !Ref AWS::NoValue
   DynamoDBTable2TEST:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -200,8 +280,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable2
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable2
+          - AttributeName: !Ref TTLAttribute2
+            Enabled: True
+          - !Ref AWS::NoValue
   DynamoDBTable3TEST:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -215,8 +303,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable3
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable3
+          - AttributeName: !Ref TTLAttribute3
+            Enabled: True
+          - !Ref AWS::NoValue
   DynamoDBTable4TEST:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -230,8 +326,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable4
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable4
+          - AttributeName: !Ref TTLAttribute4
+            Enabled: True
+          - !Ref AWS::NoValue
   DynamoDBTable1PROD:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -245,8 +349,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable1
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable1
+          - AttributeName: !Ref TTLAttribute1
+            Enabled: True
+          - !Ref AWS::NoValue
   DynamoDBTable2PROD:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -260,8 +372,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable2
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable2
+          - AttributeName: !Ref TTLAttribute2
+            Enabled: True
+          - !Ref AWS::NoValue
   DynamoDBTable3PROD:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -275,8 +395,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable3
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable3
+          - AttributeName: !Ref TTLAttribute3
+            Enabled: True
+          - !Ref AWS::NoValue
   DynamoDBTable4PROD:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -290,8 +418,16 @@ Resources:
       ProvisionedThroughput:
         ReadCapacityUnits: !Ref ReadCapacityUnitsInitial
         WriteCapacityUnits: !Ref WriteCapacityUnitsInitial
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: !Ref PITRTable4
       SSESpecification: 
         SSEEnabled: !Ref ServerSideEncryption
+      TimeToLiveSpecification:
+        !If
+          - UseTTLTable4
+          - AttributeName: !Ref TTLAttribute4
+            Enabled: True
+          - !Ref AWS::NoValue
   ReadCapacityScalableTargetTable1TEST:
     Type: "AWS::ApplicationAutoScaling::ScalableTarget"
     Properties:

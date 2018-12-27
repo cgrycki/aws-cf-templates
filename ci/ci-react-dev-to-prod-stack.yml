@@ -271,9 +271,9 @@ Resources:
                 - npm run build
                 - echo Deploying site to S3
                 - aws s3 sync ./build s3://${AWS::StackName}-website/dev --delete --acl public-read
-                - aws s3 cp ./build/index.html s3://${AWS::StackName}-website/dev/index.html --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
-                - aws s3 cp ./build/asset-manifest.json s3://${AWS::StackName}-website/dev/asset-manifest.json --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
-                - aws s3 cp ./build/service-worker.js s3://${AWS::StackName}-website/dev/service-worker.js --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
+                - aws s3 cp ./build/index.html s3://${AWS::StackName}-website/dev/index.html --cache-control 'no-cache, no-store, must-revalidate, max-age=0' --metadata-directive REPLACE --acl public-read
+                - aws s3 cp ./build/asset-manifest.json s3://${AWS::StackName}-website/dev/asset-manifest.json --cache-control 'no-cache, no-store, must-revalidate, max-age=0' --metadata-directive REPLACE --acl public-read
+                - aws s3 cp ./build/service-worker.js s3://${AWS::StackName}-website/dev/service-worker.js --cache-control 'no-cache, no-store, must-revalidate, max-age=0' --metadata-directive REPLACE --acl public-read
                 - echo Invalidating all files in cloudfront cache
             post_build:
               commands:
@@ -316,9 +316,9 @@ Resources:
                 - npm run build
                 - echo Deploying site to S3
                 - aws s3 sync ./build s3://${AWS::StackName}-website/prod --delete --acl public-read
-                - aws s3 cp ./build/index.html s3://${AWS::StackName}-website/prod/index.html --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
-                - aws s3 cp ./build/asset-manifest.json s3://${AWS::StackName}-website/dev/asset-manifest.json --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
-                - aws s3 cp ./build/service-worker.js s3://${AWS::StackName}-website/dev/service-worker.js --cache-control 'no-cache, no-store, must-revalidate' --acl public-read
+                - aws s3 cp ./build/index.html s3://${AWS::StackName}-website/prod/index.html --cache-control 'no-cache, no-store, must-revalidate, max-age=0' --metadata-directive REPLACE --acl public-read
+                - aws s3 cp ./build/asset-manifest.json s3://${AWS::StackName}-website/dev/asset-manifest.json --cache-control 'no-cache, no-store, must-revalidate, max-age=0' --metadata-directive REPLACE --acl public-read
+                - aws s3 cp ./build/service-worker.js s3://${AWS::StackName}-website/dev/service-worker.js --cache-control 'no-cache, no-store, must-revalidate, max-age=0' --metadata-directive REPLACE --acl public-read
                 - echo Invalidating all files in cloudfront cache
             post_build:
               commands:
@@ -400,21 +400,6 @@ Resources:
             Repo: !Ref GitHubRepo
             Branch: !Ref GitHubBranchPROD
             OAuthToken: !Ref GitHubToken
-          RunOrder: 1
-      - Name: Build_Deploy_Dev
-        Actions:
-        - Name: NPM_Build
-          ActionTypeId:
-            Category: Build
-            Owner: AWS
-            Version: '1'
-            Provider: 'CodeBuild'
-          InputArtifacts:
-          - Name: SourceOutput
-          OutputArtifacts:
-          - Name: BuildDevOutput
-          Configuration:
-            ProjectName: !Ref CodeBuildDEV
           RunOrder: 1
       - Name: ProdApproval
         Actions:

@@ -2,37 +2,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Pipeline using CodePipeline and CodeBuild for continuous delivery of a single-page application to S3 and CloudFront
 Parameters:
-  SiteBucketName:
-    Type: String
-    Description: Name of bucket for website content
-  SiteCloudFrontName:
-    Type: String
-    Description: Full domain name for site on cloudfront. Should look something like test.contoso.com. Will require creation of a CNAME record to resolve.
-  SiteValidationDomain:
-    Type: String
-    Description: FQDN for domain validation. Required if using custom CNAMEs with cloudfront. See https://docs.aws.amazon.com/acm/latest/APIReference/API_DomainValidationOption.html
-  SiteCloudFrontPriceClass:
-    Type: String
-    Description: Price class to use for cloudfront distribution.
-    Default: PriceClass_100
-    AllowedValues:
-      - PriceClass_100
-      - PriceClass_200
-      - PriceClass_300
-  GitHubUser:
-    Type: String
-    Description: GitHub User
-  GitHubRepo:
-    Type: String
-    Description: GitHub Repo to pull from. Only the Name. not the URL
-  GitHubBranch:
-    Type: String
-    Description: GitHub Branch
-    Default: 'master'
-  GitHubToken:
-    NoEcho: true
-    Type: String
-    Description: Secret. It might look something like 9b189a1654643522561f7b3ebd44a1531a4287af OAuthToken with access to Repo. Go to https://github.com/settings/tokens
   BuildType:
     Type: String
     Default: 'LINUX_CONTAINER'
@@ -52,25 +21,9 @@ Parameters:
   EmailAddress:
     Type: String
     Description: E-Mail address that will receive pipeline state notifications
-Conditions:
-  UseCustomDomainName: !Not [!Equals [!Ref SiteCloudFrontName, '']]
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
-      - Label:
-          default: Site Configuration
-        Parameters:
-          - SiteBucketName
-          - SiteCloudFrontName
-          - SiteValidationDomain
-          - SiteCloudFrontPriceClass
-      - Label:
-          default: GitHub Configuration
-        Parameters:
-          - GitHubToken
-          - GitHubUser
-          - GitHubRepo
-          - GitHubBranch
       - Label:
           default: Build Configuration
         Parameters:
@@ -83,22 +36,6 @@ Metadata:
         Parameters:
           - EmailAddress
     ParameterLabels:
-      SiteBucketName:
-        default: Name of S3 Bucket to create for website 
-      SiteCloudFrontName:
-        default: Site domain name for hosting in cloudfront [Optional]
-      SiteValidationDomain:
-        default: FQDN for domain validation [Optional]
-      SiteCloudFrontPriceClass:
-        default: Price class for cloudfront distribution
-      GitHubToken:
-        default: GitHub OAuth2 Token
-      GitHubUser: 
-        default: GitHub User/Org Name
-      GitHubRepo: 
-        default: GitHub Repository Name
-      GitHubBranch: 
-        default: GitHub Branch Name
       BuildType: 
         default: CodeBuild type
       BuildComputeType: 
@@ -175,7 +112,7 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
     Properties:
-      BucketName: !Ref SiteBucketName
+      BucketName: !Sub "${AWS::StackName}-frontend"
   PipelineBucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Delete
@@ -184,6 +121,11 @@ Resources:
         Rules:
           - ExpirationInDays: 1
             Status: Enabled
+  CodeCommitRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryDescription: Cache invalidator frontend
+      RepositoryName: !Sub "${AWS::StackName}_repo"
   CodeBuildBuildSite:
     Type: AWS::CodeBuild::Project
     DependsOn: CodeBuildRole
@@ -243,8 +185,6 @@ Resources:
               commands:
                 - echo Deploying site to S3
                 - aws s3 sync . s3://${SiteBucketName} --delete --acl public-read
-                - echo Invalidating all files in cloudfront cache
-                - aws cloudfront create-invalidation --distribution-id $CloudFrontDistributionId --paths '/*'
       TimeoutInMinutes: 10
   Pipeline:
     Type: AWS::CodePipeline::Pipeline
